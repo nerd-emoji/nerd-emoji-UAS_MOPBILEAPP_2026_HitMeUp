@@ -1,0 +1,35 @@
+name: hitmeup
+description: HitMeUp - Social Connection App
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/hitmeup.jpg
+    - assets/google_icon.png
+
+  # Optional: Add Nunito font from Google Fonts
+  # fonts:
+  #   - family: Nunito
+  #     fonts:
+  #       - asset: fonts/Nunito-Regular.ttf
+  #       - asset: fonts/Nunito-Bold.ttf
+  #         weight: 700
+  #       - asset: fonts/Nunito-SemiBold.ttf
+  #         weight: 600
