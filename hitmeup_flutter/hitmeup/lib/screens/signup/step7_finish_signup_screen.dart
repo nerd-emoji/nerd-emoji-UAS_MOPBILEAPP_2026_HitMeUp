@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../home/discover_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -8,6 +8,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: GradientBackground(
         child: SafeArea(
           child: Center(
@@ -39,7 +40,14 @@ class HomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: PrimaryButton(
                     label: 'EXPLORE',
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SwipeCardScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],

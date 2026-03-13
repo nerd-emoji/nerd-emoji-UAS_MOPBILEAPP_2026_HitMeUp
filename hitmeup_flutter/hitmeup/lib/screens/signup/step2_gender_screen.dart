@@ -16,6 +16,7 @@ class _Step2GenderScreenState extends State<Step2GenderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           SignupAppBar(onBack: () => Navigator.pop(context)),

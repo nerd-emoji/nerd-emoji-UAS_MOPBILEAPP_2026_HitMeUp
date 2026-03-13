@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common_widgets.dart';
 import '../../theme/app_theme.dart';
-import '../home/home_screen.dart';
+import 'step7_finish_signup_screen.dart';
 
 class Step6InterestsScreen extends StatefulWidget {
   const Step6InterestsScreen({super.key});
@@ -35,6 +35,7 @@ class _Step6InterestsScreenState extends State<Step6InterestsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           SignupAppBar(onBack: () => Navigator.pop(context)),

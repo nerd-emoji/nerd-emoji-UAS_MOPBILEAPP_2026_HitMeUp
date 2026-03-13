@@ -18,6 +18,7 @@ class _Step3BirthdayScreenState extends State<Step3BirthdayScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           SignupAppBar(onBack: () => Navigator.pop(context)),
