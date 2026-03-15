@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common_widgets.dart';
-import '../../theme/app_theme.dart';
 import 'step4_location_screen.dart';
 
 class Step2GenderScreen extends StatefulWidget {

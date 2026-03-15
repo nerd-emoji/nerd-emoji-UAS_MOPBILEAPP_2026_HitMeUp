@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common_widgets.dart';
-import '../../theme/app_theme.dart';
 import 'step5_meet_gender_screen.dart';
 
 class Step4LocationScreen extends StatefulWidget {
