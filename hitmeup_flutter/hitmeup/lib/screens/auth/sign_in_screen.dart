@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/common_widgets.dart';
 import '../../theme/app_theme.dart';
 import '../signup/step1_intro_screen.dart';
+import '../home/discover_screen.dart';
 
 class SignInScreen extends StatelessWidget {
   const SignInScreen({super.key});
@@ -9,6 +10,7 @@ class SignInScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFF448AFF),
       body: GradientBackground(
         child: SafeArea(
@@ -21,43 +23,51 @@ class SignInScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 60),
                   _buildLogo(),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 36),
                   const Text(
                     'Sign In',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 30,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textDark,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  const CustomTextField(
+                  const SizedBox(height: 28),
+                  _buildTransparentField(
                     hint: 'Username or Email',
-                    prefixIcon: Icons.person_outline_rounded,
+                    icon: Icons.person_outline_rounded,
                   ),
-                  const SizedBox(height: 12),
-                  const CustomTextField(
+                  const SizedBox(height: 14),
+                  _buildTransparentField(
                     hint: 'Password',
-                    prefixIcon: Icons.lock_outline_rounded,
-                    obscureText: true,
+                    icon: Icons.lock_outline_rounded,
+                    obscure: true,
                   ),
-                  const SizedBox(height: 20),
-                  PrimaryButton(label: 'LOGIN', onPressed: () {}),
+                  const SizedBox(height: 24),
+                  _buildButton(
+                    label: 'LOGIN',
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SwipeCardScreen()),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _googleIcon(),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 20),
                       _appleIcon(),
                     ],
                   ),
                   const SizedBox(height: 20),
                   _buildDivider(),
                   const SizedBox(height: 20),
-                  PrimaryButton(
+                  _buildButton(
                     label: 'Sign Up',
                     onPressed: () {
                       Navigator.push(
@@ -78,15 +88,15 @@ class SignInScreen extends StatelessWidget {
 
   Widget _buildLogo() {
     return Container(
-      width: 130,
-      height: 130,
+      width: 255,
+      height: 255,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.15),
-            blurRadius: 20,
+            blurRadius: 24,
             offset: const Offset(0, 8),
           ),
         ],
@@ -96,63 +106,107 @@ class SignInScreen extends StatelessWidget {
           'assets/hitmeup.jpg',
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) =>
-              const Icon(Icons.people_rounded, size: 60, color: AppColors.pinkTop),
+              const Icon(Icons.people_rounded, size: 90, color: AppColors.pinkTop),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransparentField({
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF6750A4),
+          width: 1.5,
+        ),
+      ),
+      child: TextField(
+        obscureText: obscure,
+        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.black54),
+          prefixIcon: Icon(icon, color: Colors.black54, size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildButton({required String label, required VoidCallback onPressed}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.textDark,
+          elevation: 3,
+          shadowColor: Colors.black26,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+        ),
+        onPressed: onPressed,
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            color: AppColors.textDark,
+          ),
         ),
       ),
     );
   }
 
   Widget _googleIcon() {
-  return Container(
-    width: 52,
-    height: 52,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: Colors.white,
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Center(
+    return GestureDetector(
+      onTap: () {},
       child: Image.asset(
         'assets/google_icon.png',
-        width: 26,
-        height: 26,
+        width: 36,
+        height: 36,
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _appleIcon() {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2)),
-        ],
+    return GestureDetector(
+      onTap: () {},
+      child: const Icon(
+        Icons.apple_rounded,
+        size: 40,
+        color: Colors.black,
       ),
-      child: const Center(child: Icon(Icons.apple_rounded, size: 28, color: Colors.black)),
     );
   }
 
   Widget _buildDivider() {
     return Row(
       children: [
-        Expanded(child: Container(height: 1, color: Colors.white54)),
+        Expanded(child: Container(height: 1, color: Colors.black26)),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 12),
-          child: Text('OR', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+          child: Text(
+            'OR',
+            style: TextStyle(
+              color: Colors.black54,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
         ),
-        Expanded(child: Container(height: 1, color: Colors.white54)),
+        Expanded(child: Container(height: 1, color: Colors.black26)),
       ],
     );
   }
 }
-

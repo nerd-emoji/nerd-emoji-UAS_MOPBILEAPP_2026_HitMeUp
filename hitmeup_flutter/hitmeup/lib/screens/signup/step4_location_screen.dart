@@ -33,6 +33,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           SignupAppBar(onBack: () => Navigator.pop(context)),
@@ -41,33 +42,28 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
               child: SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  padding: const EdgeInsets.only(left: 36, right: 28),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 20),
                       const Center(
-                        child: StepIndicator(totalSteps: 6, currentStep: 2),
+                        child: StepIndicator(totalSteps: 6, currentStep: 3),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 36),
                       const Text(
                         'Where do you live?',
-                        style: AppTextStyles.heading,
+                        style: TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          height: 1.0,
+                        ),
                       ),
                       const SizedBox(height: 32),
                       _buildDropdown(),
                       const Spacer(),
-                      PrimaryButton(
-                        label: 'CONTINUE',
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const Step5MeetGenderScreen(),
-                            ),
-                          );
-                        },
-                      ),
+                      _buildContinueButton(context),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -84,35 +80,75 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF6750A4),
+          width: 1,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedLocation,
           isExpanded: true,
+          dropdownColor: const Color(0xFF6750A4),
           icon: const Icon(
             Icons.keyboard_arrow_down_rounded,
-            color: AppColors.textDark,
+            color: Colors.white,
           ),
           style: const TextStyle(
-            fontSize: 15,
-            color: AppColors.textDark,
-            fontWeight: FontWeight.w500,
+            fontSize: 16,
+            color: Colors.white,
+            fontWeight: FontWeight.w400,
           ),
           onChanged: (value) {
             if (value != null) setState(() => _selectedLocation = value);
           },
           items: _locations
-              .map((loc) => DropdownMenuItem(value: loc, child: Text(loc)))
+              .map((loc) => DropdownMenuItem(
+                    value: loc,
+                    child: Text(
+                      loc,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ))
               .toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContinueButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 67,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF656565),
+          elevation: 3,
+          shadowColor: Colors.black26,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const Step5MeetGenderScreen()),
+          );
+        },
+        child: const Text(
+          'CONTINUE',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+            color: Color(0xFF656565),
+          ),
         ),
       ),
     );

@@ -28,11 +28,11 @@ class StepIndicator extends StatelessWidget {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 20 : 8,
-          height: 8,
+          width: 10,
+          height: 10,
           decoration: BoxDecoration(
             color: isActive ? AppColors.blueBottom : Colors.white54,
-            borderRadius: BorderRadius.circular(4),
+            shape: BoxShape.circle,
           ),
         );
       }),

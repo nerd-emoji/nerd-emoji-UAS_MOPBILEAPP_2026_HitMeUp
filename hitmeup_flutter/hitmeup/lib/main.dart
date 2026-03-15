@@ -23,6 +23,14 @@ class HitMeUpApp extends StatelessWidget {
       title: 'HitMeUp',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        // Keep layout static when the keyboard opens.
+        return MediaQuery(
+          data: mediaQuery.copyWith(viewInsets: EdgeInsets.zero),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: const SplashScreen(),
     );
   }
