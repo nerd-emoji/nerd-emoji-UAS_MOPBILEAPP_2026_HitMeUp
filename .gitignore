@@ -1,0 +1,9 @@
+# Ignore generated files from duplicate top-level Flutter copy
+hitmeup_flutter/hitmeup/.dart_tool/
+hitmeup_flutter/hitmeup/build/
+hitmeup_flutter/hitmeup/.pub-cache/
+hitmeup_flutter/hitmeup/.pub/
+hitmeup_flutter/hitmeup/android/.gradle/
+hitmeup_flutter/hitmeup/android/local.properties
+hitmeup_flutter/hitmeup/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+hitmeup_flutter/hitmeup/android/

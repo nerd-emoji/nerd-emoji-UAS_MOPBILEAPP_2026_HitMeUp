@@ -94,14 +94,14 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                 margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.blueBottom,
+                  color: const Color(0xFFFF4081),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
                   children: [
                     Image.asset(
                       'assets/AIBrain.png',
-                      width: 28, height: 28,
+                      width: 50, height: 50,
                       fit: BoxFit.contain,
                       color: Colors.white,
                       errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
@@ -113,8 +113,8 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Ask help to Chat.AI', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                        Text('ask AI to help you with itinerary or others...', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                        Text('Ask help to Chat.AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text('ask AI to help you with itinerary or others...', style: TextStyle(fontSize: 9, color: Colors.white)),
                       ],
                     ),
                   ],
@@ -324,7 +324,9 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     );
   }
 
-  Widget _buildProgressBar() {
+  Widget _buildProgressBar(double progress) {
+    final clampedProgress = progress.clamp(0.0, 1.0);
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Container(
@@ -332,18 +334,22 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFF2859C5),
           borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white24, width: 1),
         ),
         child: Stack(
           children: [
-            Positioned(
-              top: 5,
-              left: 12,
-              right: 12,
-              child: Container(
-                height: 2,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(2),
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: clampedProgress,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -371,10 +377,17 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
               'Yang ikut malem ini mabar',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
             ),
+            const SizedBox(height: 4),
+            Text(
+              '$totalVotes votes',
+              style: const TextStyle(fontSize: 12, color: Colors.black87),
+            ),
             const SizedBox(height: 14),
             ...List.generate(_pollOptions.length, (i) {
               final isSelected = _selectedPollOption == i;
               final voteCount = _hasVoted ? _pollVotes[i] : 0;
+              final optionVotes = _pollVotes[i];
+              final progress = totalVotes == 0 ? 0.0 : optionVotes / totalVotes;
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 14),
@@ -450,7 +463,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            _buildProgressBar(),
+                            _buildProgressBar(progress),
                           ],
                         ),
                       ),
@@ -459,11 +472,11 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                 ),
               );
             }),
-            Align(
+            const Align(
               alignment: Alignment.centerRight,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Text('16:30', style: TextStyle(fontSize: 10, color: Colors.black54)),
                   SizedBox(width: 4),
                   Icon(Icons.done_all, size: 12, color: Colors.black54),

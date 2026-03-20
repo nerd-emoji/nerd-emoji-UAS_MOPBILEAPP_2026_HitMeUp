@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'chat.dart';
 import 'discover.dart';
+import 'editProfile.dart';
 import 'friends.dart';
 import 'requests.dart';
 import '../../theme/app_theme.dart';
@@ -17,6 +18,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 	static const int _diamondBalance = 17;
 
 	int _selectedBottomNavIndex = 4;
+
+	// Profile data
+	String _name = 'Alfraz Aldebaran';
+	String _birthday = '30 September 2006';
+	String _gender = 'Man';
+	String _location = 'Tangerang Selatan';
+	List<String> _interests = [
+		'Watch horror films',
+		'Roblox',
+		'Content Creator',
+		'Matcha',
+	];
 
 	@override
 	Widget build(BuildContext context) {
@@ -68,23 +81,137 @@ class _ProfileScreenState extends State<ProfileScreen> {
 				selectedIndex: _selectedBottomNavIndex,
 				onItemTap: _handleBottomNavTap,
 			),
-			body: DecoratedBox(
-				decoration: const BoxDecoration(gradient: AppGradient.background),
-				child: const SafeArea(
-					top: false,
-					child: Center(
-						child: Text(
-							'Profile Screen',
-							style: TextStyle(
-								color: Colors.white,
-								fontSize: 20,
-								fontWeight: FontWeight.w700,
-							),
+		body: Container(
+			decoration: const BoxDecoration(gradient: AppGradient.background),
+			child: SafeArea(
+				top: false,
+				child: SingleChildScrollView(
+					padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+					child: ConstrainedBox(
+						constraints: BoxConstraints(
+							minHeight: MediaQuery.of(context).size.height - 120,
+						),
+						child: Column(
+							mainAxisSize: MainAxisSize.min,
+							children: [
+								Container(
+									width: 180,
+									height: 180,
+									padding: const EdgeInsets.all(5),
+									decoration: const BoxDecoration(
+										shape: BoxShape.circle,
+										color: Color(0xFF2E8DFF),
+									),
+									child: const CircleAvatar(
+										backgroundImage: AssetImage('assets/profilepic.png'),
+									),
+								),
+								const SizedBox(height: 12),
+								Container(
+									padding: const EdgeInsets.symmetric(
+										horizontal: 28,
+										vertical: 8,
+									),
+									decoration: BoxDecoration(
+										color: Colors.white.withValues(alpha: 0.92),
+										borderRadius: BorderRadius.circular(16),
+									),
+								child: Text(
+									_name,
+									style: const TextStyle(
+											fontSize: 17,
+											fontWeight: FontWeight.w700,
+											color: Color(0xFF1F1F1F),
+										),
+									),
+								),
+								const SizedBox(height: 18),
+								Container(
+									width: double.infinity,
+									padding: const EdgeInsets.symmetric(
+										horizontal: 16,
+										vertical: 14,
+									),
+									decoration: BoxDecoration(
+										color: Colors.white.withValues(alpha: 0.84),
+										borderRadius: BorderRadius.circular(14),
+									),
+									child: Column(
+										children: [
+											_ProfileInfoRow(
+												label: 'Birthday date',
+												value: _birthday,
+											),
+											const SizedBox(height: 10),
+											_ProfileInfoRow(label: 'Gender', value: _gender),
+											const SizedBox(height: 10),
+											_ProfileInfoRow(
+												label: 'Location',
+												value: _location,
+											),
+											const SizedBox(height: 10),
+											_ProfileInfoRow(
+												label: 'My interests',
+												value: _interests.join('\n'),
+											),
+										],
+									),
+								),
+								const SizedBox(height: 16),
+								SizedBox(
+									width: 200,
+									height: 44,
+									child: OutlinedButton(
+										onPressed: _navigateToEditProfile,
+										style: OutlinedButton.styleFrom(
+											backgroundColor: const Color(0xFFF83D8D),
+											foregroundColor: Colors.white,
+											side: const BorderSide(
+												color: Color(0xFF2E8DFF),
+												width: 2,
+											),
+											shape: RoundedRectangleBorder(
+												borderRadius: BorderRadius.circular(20),
+											),
+											textStyle: const TextStyle(
+											fontSize: 17,
+												fontWeight: FontWeight.w600,
+											),
+										),
+										child: const Text('Edit profile'),
+									),
+								),
+							],
 						),
 					),
 				),
 			),
+		),
+	);
+	}
+
+	void _navigateToEditProfile() async {
+		final result = await Navigator.of(context).push(
+			MaterialPageRoute(
+				builder: (context) => EditProfileScreen(
+					initialName: _name,
+					initialBirthday: _birthday,
+					initialGender: _gender,
+					initialLocation: _location,
+					initialInterests: _interests,
+				),
+			),
 		);
+
+		if (result != null && result is Map) {
+			setState(() {
+				_name = result['name'] ?? _name;
+				_birthday = result['birthday'] ?? _birthday;
+				_gender = result['gender'] ?? _gender;
+				_location = result['location'] ?? _location;
+				_interests = result['interests'] ?? _interests;
+			});
+		}
 	}
 
 	void _handleBottomNavTap(int index) {
@@ -113,6 +240,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
 				transitionsBuilder: (_, animation, __, child) =>
 					FadeTransition(opacity: animation, child: child),
 			),
+		);
+	}
+}
+
+class _ProfileInfoRow extends StatelessWidget {
+	const _ProfileInfoRow({required this.label, required this.value});
+
+	final String label;
+	final String value;
+
+	@override
+	Widget build(BuildContext context) {
+		return Row(
+			crossAxisAlignment: CrossAxisAlignment.start,
+			children: [
+				SizedBox(
+					width: 120,
+					child: Text(
+						label,
+						style: const TextStyle(
+							fontSize: 18,
+							fontWeight: FontWeight.w600,
+							color: Color(0xFF202020),
+						),
+					),
+				),
+				Expanded(
+					child: Text(
+						value,
+						style: TextStyle(
+							fontSize: 18,
+							height: 1.25,
+							fontWeight: FontWeight.w500,
+							color: Colors.black.withValues(alpha: 0.52),
+						),
+					),
+				),
+			],
 		);
 	}
 }

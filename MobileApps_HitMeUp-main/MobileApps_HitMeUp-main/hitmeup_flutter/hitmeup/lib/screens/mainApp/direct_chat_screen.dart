@@ -80,14 +80,14 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                 margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.blueBottom,
+                  color: const Color(0xFFFF4081),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
                   children: [
                     Image.asset(
                       'assets/AIBrain.png',
-                      width: 28, height: 28,
+                      width: 50, height: 50,
                       fit: BoxFit.contain,
                       color: Colors.white,
                       errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
@@ -99,8 +99,8 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Ask help to Chat.AI', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                        Text('ask AI to help you with itinerary or others...', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                        Text('Ask help to Chat.AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text('ask AI to help you with itinerary or others...', style: TextStyle(fontSize: 9, color: Colors.white)),
                       ],
                     ),
                   ],

@@ -69,9 +69,9 @@ class _RequestsScreenState extends State<RequestsScreen> {
 				selectedIndex: _selectedBottomNavIndex,
 				onItemTap: _handleBottomNavTap,
 			),
-			body: DecoratedBox(
-				decoration: const BoxDecoration(gradient: AppGradient.background),
-				child: const SafeArea(
+			body: const DecoratedBox(
+				decoration: BoxDecoration(gradient: AppGradient.background),
+				child: SafeArea(
 					top: false,
 					child: Center(
 						child: Text(
