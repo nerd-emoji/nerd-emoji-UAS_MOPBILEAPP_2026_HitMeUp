@@ -153,6 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 											_ProfileInfoRow(
 												label: 'My interests',
 												value: _interests.join('\n'),
+												alignTop: true,
 											),
 										],
 									),
@@ -245,35 +246,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 class _ProfileInfoRow extends StatelessWidget {
-	const _ProfileInfoRow({required this.label, required this.value});
+	const _ProfileInfoRow({
+		required this.label,
+		required this.value,
+		this.alignTop = false,
+	});
 
 	final String label;
 	final String value;
+	final bool alignTop;
 
 	@override
 	Widget build(BuildContext context) {
 		return Row(
-			crossAxisAlignment: CrossAxisAlignment.start,
+			crossAxisAlignment:
+				alignTop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
 			children: [
 				SizedBox(
-					width: 120,
-					child: Text(
-						label,
-						style: const TextStyle(
-							fontSize: 18,
-							fontWeight: FontWeight.w600,
-							color: Color(0xFF202020),
+					width: 132,
+					child: Padding(
+						padding: EdgeInsets.only(top: alignTop ? 2 : 0),
+						child: Text(
+							label,
+							maxLines: 1,
+							overflow: TextOverflow.ellipsis,
+							style: const TextStyle(
+								fontSize: 18,
+								fontWeight: FontWeight.w600,
+								color: Color(0xFF202020),
+							),
 						),
 					),
 				),
 				Expanded(
-					child: Text(
-						value,
-						style: TextStyle(
-							fontSize: 18,
-							height: 1.25,
-							fontWeight: FontWeight.w500,
-							color: Colors.black.withValues(alpha: 0.52),
+					child: Align(
+						alignment: Alignment.centerLeft,
+						child: Text(
+							value,
+							style: TextStyle(
+								fontSize: 18,
+								height: 1.25,
+								fontWeight: FontWeight.w500,
+								color: Colors.black.withValues(alpha: 0.52),
+							),
 						),
 					),
 				),

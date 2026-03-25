@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 
@@ -23,18 +24,18 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
 	late TextEditingController _nameController;
-	late TextEditingController _birthdayController;
 	late TextEditingController _genderController;
 	late TextEditingController _locationController;
 	late List<TextEditingController> _interestControllers;
+	late DateTime _selectedBirthday;
 
 	@override
 	void initState() {
 		super.initState();
 		_nameController = TextEditingController(text: widget.initialName);
-		_birthdayController = TextEditingController(text: widget.initialBirthday);
 		_genderController = TextEditingController(text: widget.initialGender);
 		_locationController = TextEditingController(text: widget.initialLocation);
+		_selectedBirthday = _parseBirthday(widget.initialBirthday);
 		_interestControllers = widget.initialInterests
 			.map((interest) => TextEditingController(text: interest))
 			.toList();
@@ -43,7 +44,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 	@override
 	void dispose() {
 		_nameController.dispose();
-		_birthdayController.dispose();
 		_genderController.dispose();
 		_locationController.dispose();
 		for (var controller in _interestControllers) {
@@ -145,10 +145,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 											const SizedBox(height: 16),
 
 											// Birthday Field
-											_buildInputField(
-												controller: _birthdayController,
-												label: 'Birthday date',
-											),
+											_buildBirthdayField(),
 											const SizedBox(height: 10),
 
 											// Gender Field
@@ -306,11 +303,127 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 		);
 	}
 
+	Widget _buildBirthdayField() {
+		return Row(
+			children: [
+				const SizedBox(
+					width: 100,
+					child: Text(
+						'Birthday date',
+						style: TextStyle(
+							fontSize: 11,
+							fontWeight: FontWeight.w600,
+							color: Color(0xFF202020),
+						),
+					),
+				),
+				Expanded(
+					child: GestureDetector(
+						onTap: _openBirthdayPicker,
+						child: Container(
+							height: 32,
+							padding: const EdgeInsets.symmetric(horizontal: 8),
+							decoration: BoxDecoration(
+								color: Colors.white,
+								borderRadius: BorderRadius.circular(8),
+								border: Border.all(
+									color: const Color(0xFF448AFF),
+									width: 1.5,
+								),
+							),
+							child: Row(
+								children: [
+									Expanded(
+										child: Text(
+											_formatBirthday(_selectedBirthday),
+											style: const TextStyle(
+												fontSize: 11,
+												color: Colors.black,
+											),
+										),
+									),
+									const Icon(
+										Icons.calendar_today_rounded,
+										size: 13,
+										color: Color(0xFF448AFF),
+									),
+								],
+							),
+						),
+					),
+				),
+			],
+		);
+	}
+
+	void _openBirthdayPicker() {
+		showCupertinoModalPopup<void>(
+			context: context,
+			builder: (BuildContext context) {
+				DateTime tempDate = _selectedBirthday;
+				return Container(
+					height: 300,
+					color: Colors.white,
+					child: Column(
+						children: [
+							SizedBox(
+								height: 44,
+								child: Row(
+									mainAxisAlignment: MainAxisAlignment.spaceBetween,
+									children: [
+										CupertinoButton(
+											padding: const EdgeInsets.symmetric(horizontal: 16),
+											onPressed: () => Navigator.of(context).pop(),
+											child: const Text('Cancel'),
+										),
+										CupertinoButton(
+											padding: const EdgeInsets.symmetric(horizontal: 16),
+											onPressed: () {
+												setState(() => _selectedBirthday = tempDate);
+												Navigator.of(context).pop();
+											},
+											child: const Text('Done'),
+										),
+									],
+								),
+							),
+							const Divider(height: 1),
+							Expanded(
+								child: CupertinoDatePicker(
+									mode: CupertinoDatePickerMode.date,
+									initialDateTime: _selectedBirthday,
+									maximumDate: DateTime.now(),
+									onDateTimeChanged: (DateTime date) {
+										tempDate = date;
+									},
+								),
+							),
+						],
+					),
+				);
+			},
+		);
+	}
+
+	DateTime _parseBirthday(String value) {
+		final parsed = DateTime.tryParse(value);
+		if (parsed != null) {
+			return parsed;
+		}
+		return DateTime(2002, 5, 8);
+	}
+
+	String _formatBirthday(DateTime value) {
+		final month = value.month.toString().padLeft(2, '0');
+		final day = value.day.toString().padLeft(2, '0');
+		return '${value.year}-$month-$day';
+	}
+
 	void _savProfile() {
 		// Collect all the edited data
 		final updatedData = {
 			'name': _nameController.text,
-			'birthday': _birthdayController.text,
+			'birthday': _formatBirthday(_selectedBirthday),
 			'gender': _genderController.text,
 			'location': _locationController.text,
 			'interests': _interestControllers.map((c) => c.text).toList(),
