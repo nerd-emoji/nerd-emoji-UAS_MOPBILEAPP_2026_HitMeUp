@@ -23,6 +23,21 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+	static const List<String> _monthNames = [
+		'January',
+		'February',
+		'March',
+		'April',
+		'May',
+		'June',
+		'July',
+		'August',
+		'September',
+		'October',
+		'November',
+		'December',
+	];
+
 	late TextEditingController _nameController;
 	late TextEditingController _genderController;
 	late TextEditingController _locationController;
@@ -410,13 +425,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 		if (parsed != null) {
 			return parsed;
 		}
+
+		final match = RegExp(
+			r'^\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s*$',
+		).firstMatch(value);
+
+		if (match != null) {
+			final day = int.tryParse(match.group(1)!);
+			final monthName = match.group(2)!;
+			final year = int.tryParse(match.group(3)!);
+			final monthIndex = _monthNames.indexWhere(
+				(month) => month.toLowerCase() == monthName.toLowerCase(),
+			);
+
+			if (day != null && year != null && monthIndex != -1) {
+				final month = monthIndex + 1;
+				final candidate = DateTime(year, month, day);
+				if (candidate.year == year &&
+						candidate.month == month &&
+						candidate.day == day) {
+					return candidate;
+				}
+			}
+		}
+
 		return DateTime(2002, 5, 8);
 	}
 
 	String _formatBirthday(DateTime value) {
-		final month = value.month.toString().padLeft(2, '0');
-		final day = value.day.toString().padLeft(2, '0');
-		return '${value.year}-$month-$day';
+		final monthName = _monthNames[value.month - 1];
+		return '${value.day} $monthName ${value.year}';
 	}
 
 	void _savProfile() {
