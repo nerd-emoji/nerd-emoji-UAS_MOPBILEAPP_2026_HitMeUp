@@ -11,7 +11,7 @@ class Step6InterestsScreen extends StatefulWidget {
 }
 
 class _Step6InterestsScreenState extends State<Step6InterestsScreen> {
-  String? _selected;
+  final Map<String, String?> _selectedInterests = {};
 
   final Map<String, List<String>> _categories = {
     'Lifestyles': [
@@ -80,11 +80,14 @@ class _Step6InterestsScreenState extends State<Step6InterestsScreen> {
                                       const SizedBox(width: 8),
                                   itemBuilder: (_, i) {
                                     final item = entry.value[i];
-                                    final isSelected = _selected == item;
+                                    final isSelected = _selectedInterests[entry.key] == item;
                                     return GestureDetector(
                                       onTap: () => setState(() {
-                                        _selected =
-                                            _selected == item ? null : item;
+                                        if (_selectedInterests[entry.key] == item) {
+                                          _selectedInterests[entry.key] = null;
+                                        } else {
+                                          _selectedInterests[entry.key] = item;
+                                        }
                                       }),
                                       child: AnimatedContainer(
                                         duration:
@@ -194,6 +197,8 @@ class _Step6InterestsScreenState extends State<Step6InterestsScreen> {
           ),
         ),
         onPressed: () {
+          final selectedInterests = _selectedInterests.values.where((interest) => interest != null).toList();
+          // TODO: Save or pass the selectedInterests
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) => const SwipeCardScreen()),

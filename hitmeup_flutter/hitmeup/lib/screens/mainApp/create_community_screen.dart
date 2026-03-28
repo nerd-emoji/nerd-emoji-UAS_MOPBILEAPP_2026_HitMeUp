@@ -187,6 +187,7 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                               ),
                               onPressed: () {
                                 final community = Community(
+                                  id: 'community_${DateTime.now().millisecondsSinceEpoch}',
                                   name: _nameController.text,
                                   participants: int.tryParse(_maxController.text) ?? 1,
                                 );

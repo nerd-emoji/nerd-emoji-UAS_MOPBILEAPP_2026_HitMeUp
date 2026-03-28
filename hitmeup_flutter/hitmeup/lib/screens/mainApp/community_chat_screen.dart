@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'chat_models.dart';
 import 'ai_chat_screen.dart';
+import 'chat.dart';
 
 class CommunityChatScreen extends StatefulWidget {
   final Community community;
@@ -18,23 +19,21 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   int? _selectedPollOption;
   bool _hasVoted = false;
 
-  final List<Map<String, dynamic>> _messages = [
-    {'text': 'Malam ini mau mabar ga?', 'isMe': false, 'sender': 'Rosia morens', 'time': '16:07'},
-    {'text': 'wii boleh tu, ayoo', 'isMe': false, 'sender': 'Petra', 'time': '16:10'},
-    {'text': 'enaknya jam berapa ya?', 'isMe': false, 'sender': 'Kiranti', 'time': '16:18'},
-    {'text': 'Jam 21.00, bagaimana?', 'isMe': true, 'sender': '', 'time': '16:26'},
-    {'text': 'Bolehhh tu', 'isMe': false, 'sender': 'Rosia morens', 'time': '16:28'},
-    {'isPoll': true, 'time': '16:30'},
-    {'text': 'Gass ramaikan!!', 'isMe': true, 'sender': '', 'time': '16:31'},
-    {'text': 'Iya nih sudah lama tidak mabar', 'isMe': false, 'sender': 'Vania kursel', 'time': '17:00'},
-    {'text': 'Maaf ya teman - teman tidak bisa ikut dulu', 'isMe': false, 'sender': 'Yuqi nako', 'time': '18:10'},
-  ];
-
   final List<String> _pollOptions = ['Ayoo mabar!!', 'Maaf lagi gabisa'];
   final List<int> _pollVotes = [24, 7];
 
-  // rgba(115, 164, 245, 1)
   static const Color _bubbleBlue = Color(0xFF73A4F5);
+
+  List<Map<String, dynamic>> get _messages {
+    // Import the centralized data from ChatDataProvider
+    // ignore: invalid_use_of_protected_member
+    final data = ChatDataProvider.communityChatData[widget.community.id];
+    if (data != null) return data;
+    return [
+      {'id': '${widget.community.id}_001', 'communityId': widget.community.id, 'senderId': 'me', 'text': 'Halo semua!', 'isMe': true, 'sender': '', 'time': '10:00', 'type': 'text'},
+      {'id': '${widget.community.id}_002', 'communityId': widget.community.id, 'senderId': 'other', 'text': 'Selamat datang!', 'isMe': false, 'sender': 'Member', 'time': '10:01', 'type': 'text'},
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,138 +82,143 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                 ),
               ),
             ),
-            GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AiChatScreen()),
-              ),
-              child: Container(
-                width: double.infinity,
-                height: 64,
-                margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF4081),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      'assets/AIBrain.png',
-                      width: 50, height: 50,
-                      fit: BoxFit.contain,
-                      color: Colors.white,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
+                    // Chat.AI banner
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AiChatScreen()),
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        height: 64,
+                        margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.blueBottom,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          children: [
+                            Image.asset(
+                              'assets/AIBrain.png',
+                              width: 28, height: 28,
+                              fit: BoxFit.contain,
+                              color: Colors.white,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(width: 1, height: 40, color: Colors.white),
+                            const SizedBox(width: 12),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Ask help to Chat.AI', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                                Text('ask AI to help you with itinerary or others...', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Container(width: 1, height: 40, color: Colors.white),
-                    const SizedBox(width: 12),
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Ask help to Chat.AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                        Text('ask AI to help you with itinerary or others...', style: TextStyle(fontSize: 9, color: Colors.white)),
-                      ],
+                    // Input bar
+                    Container(
+                      color: Colors.white,
+                      padding: EdgeInsets.only(
+                        left: 16, right: 16, top: 4,
+                        bottom: MediaQuery.of(context).padding.bottom + 8,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => setState(() => _showAttachMenu = !_showAttachMenu),
+                              child: AnimatedRotation(
+                                turns: _showAttachMenu ? 0.125 : 0,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                                child: Container(
+                                  width: 32, height: 32,
+                                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
+                                  child: const Icon(Icons.add, size: 20, color: Colors.black),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _controller,
+                                decoration: const InputDecoration(
+                                  hintText: 'Message',
+                                  hintStyle: TextStyle(color: Colors.black38),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.mic, color: Colors.black, size: 24),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_upward, color: Colors.black, size: 24),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-            Container(
-              color: Colors.white,
-              padding: EdgeInsets.only(
-                left: 16, right: 16, top: 4,
-                bottom: MediaQuery.of(context).padding.bottom + 8,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                    child: _showAttachMenu
-                        ? AnimatedOpacity(
-                            opacity: 1.0,
-                            duration: const Duration(milliseconds: 300),
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [Color(0xFF448AFF), Colors.white, Color(0xFFFF4081)],
-                                  stops: [0.0, 0.5, 1.0],
-                                ),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildAttachItem(Icons.photo_library_rounded, 'Gallery'),
-                                  const SizedBox(height: 6),
-                                  _buildAttachItem(Icons.camera_alt_rounded, 'Camera'),
-                                  const SizedBox(height: 6),
-                                  GestureDetector(
-                                    onTap: () {
-                                      setState(() => _showAttachMenu = false);
-                                      _showCreatePollDialog(context);
-                                    },
-                                    child: _buildAttachItem(Icons.align_horizontal_left_rounded, 'Poll'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => setState(() => _showAttachMenu = !_showAttachMenu),
-                          child: AnimatedRotation(
-                            turns: _showAttachMenu ? 0.125 : 0,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                            child: Container(
-                              width: 32, height: 32,
-                              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
-                              child: const Icon(Icons.add, size: 20, color: Colors.black),
-                            ),
+                // Popup attachment overlap di atas Chat.AI
+                if (_showAttachMenu)
+                  Positioned(
+                    bottom: 80 + MediaQuery.of(context).padding.bottom + 16,
+                    left: 16,
+                    child: AnimatedOpacity(
+                      opacity: 1.0,
+                      duration: const Duration(milliseconds: 250),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFF448AFF), Colors.white, Color(0xFFFF4081)],
+                            stops: [0.0, 0.5, 1.0],
                           ),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4))],
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            decoration: const InputDecoration(
-                              hintText: 'Message',
-                              hintStyle: TextStyle(color: Colors.black38),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildAttachItem(Icons.photo_library_rounded, 'Gallery'),
+                            const SizedBox(height: 6),
+                            _buildAttachItem(Icons.camera_alt_rounded, 'Camera'),
+                            const SizedBox(height: 6),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() => _showAttachMenu = false);
+                                _showCreatePollDialog(context);
+                              },
+                              child: _buildAttachItem(Icons.align_horizontal_left_rounded, 'Poll'),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.mic, color: Colors.black, size: 24),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_upward, color: Colors.black, size: 24),
-                      ],
+                      ),
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
           ],
         ),
@@ -224,10 +228,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
 
   Widget _buildAppBar(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top,
-        left: 8, right: 16, bottom: 8,
-      ),
+      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, left: 8, right: 16, bottom: 8),
       child: Row(
         children: [
           IconButton(
@@ -285,28 +286,13 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                   if (!isMe && sender.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        sender,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.black87,
-                        ),
-                      ),
+                      child: Text(sender, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.black87)),
                     ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Flexible(
-                        child: Text(
-                          text,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isMe ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                      ),
+                      Flexible(child: Text(text, style: TextStyle(fontSize: 13, color: isMe ? Colors.white : Colors.black87))),
                       const SizedBox(width: 8),
                       Text(time, style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.black45)),
                       if (isMe) ...[
@@ -324,33 +310,19 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     );
   }
 
-  Widget _buildProgressBar(double progress) {
-    final clampedProgress = progress.clamp(0.0, 1.0);
-
+  Widget _buildProgressBar() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Container(
         height: 14,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2859C5),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white24, width: 1),
-        ),
+        decoration: BoxDecoration(color: const Color(0xFF2859C5), borderRadius: BorderRadius.circular(10)),
         child: Stack(
           children: [
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: clampedProgress,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+            Positioned(
+              top: 5, left: 12, right: 12,
+              child: Container(
+                height: 2,
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.5), borderRadius: BorderRadius.circular(2)),
               ),
             ),
           ],
@@ -361,34 +333,20 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
 
   Widget _buildPollBubble() {
     final totalVotes = _pollVotes.reduce((a, b) => a + b);
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Container(
-        decoration: BoxDecoration(
-          color: _bubbleBlue,
-          borderRadius: BorderRadius.circular(16),
-        ),
+        decoration: BoxDecoration(color: _bubbleBlue, borderRadius: BorderRadius.circular(16)),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Yang ikut malem ini mabar',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '$totalVotes votes',
-              style: const TextStyle(fontSize: 12, color: Colors.black87),
-            ),
+            const Text('Yang ikut malem ini mabar',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
             const SizedBox(height: 14),
             ...List.generate(_pollOptions.length, (i) {
               final isSelected = _selectedPollOption == i;
               final voteCount = _hasVoted ? _pollVotes[i] : 0;
-              final optionVotes = _pollVotes[i];
-              final progress = totalVotes == 0 ? 0.0 : optionVotes / totalVotes;
-
               return Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: GestureDetector(
@@ -411,9 +369,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                           color: isSelected ? Colors.black : Colors.transparent,
                           border: Border.all(color: Colors.black, width: 2),
                         ),
-                        child: isSelected
-                            ? const Icon(Icons.check, size: 14, color: Colors.white)
-                            : null,
+                        child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -422,48 +378,27 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                           children: [
                             Row(
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    _pollOptions[i],
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black),
-                                  ),
-                                ),
+                                Expanded(child: Text(_pollOptions[i],
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black))),
                                 if (_hasVoted) ...[
                                   SizedBox(
                                     width: 36, height: 20,
                                     child: Stack(
                                       children: [
-                                        Positioned(
-                                          left: 0,
-                                          child: CircleAvatar(
-                                            radius: 10,
-                                            backgroundImage: NetworkImage(
-                                              i == 0 ? 'https://i.pravatar.cc/40?img=44' : 'https://i.pravatar.cc/40?img=13',
-                                            ),
-                                          ),
-                                        ),
-                                        Positioned(
-                                          left: 14,
-                                          child: CircleAvatar(
-                                            radius: 10,
-                                            backgroundImage: NetworkImage(
-                                              i == 0 ? 'https://i.pravatar.cc/40?img=11' : 'https://i.pravatar.cc/40?img=24',
-                                            ),
-                                          ),
-                                        ),
+                                        Positioned(left: 0, child: CircleAvatar(radius: 10,
+                                          backgroundImage: NetworkImage(i == 0 ? 'https://i.pravatar.cc/40?img=44' : 'https://i.pravatar.cc/40?img=13'))),
+                                        Positioned(left: 14, child: CircleAvatar(radius: 10,
+                                          backgroundImage: NetworkImage(i == 0 ? 'https://i.pravatar.cc/40?img=11' : 'https://i.pravatar.cc/40?img=24'))),
                                       ],
                                     ),
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    '$voteCount',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-                                  ),
+                                  Text('$voteCount', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black)),
                                 ],
                               ],
                             ),
                             const SizedBox(height: 6),
-                            _buildProgressBar(progress),
+                            _buildProgressBar(),
                           ],
                         ),
                       ),
@@ -472,11 +407,11 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                 ),
               );
             }),
-            const Align(
+            Align(
               alignment: Alignment.centerRight,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
+                children: const [
                   Text('16:30', style: TextStyle(fontSize: 10, color: Colors.black54)),
                   SizedBox(width: 4),
                   Icon(Icons.done_all, size: 12, color: Colors.black54),
@@ -488,10 +423,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
             TextButton(
               onPressed: () {},
               child: const Center(
-                child: Text(
-                  'View votes',
-                  style: TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w500),
-                ),
+                child: Text('View votes', style: TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.w500)),
               ),
             ),
           ],
@@ -517,32 +449,20 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
             children: [
               const Text('Buat Poll', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              TextField(
-                controller: questionController,
-                decoration: InputDecoration(
-                  hintText: 'Pertanyaan poll...',
+              TextField(controller: questionController,
+                decoration: InputDecoration(hintText: 'Pertanyaan poll...',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
               const SizedBox(height: 10),
-              TextField(
-                controller: option1Controller,
-                decoration: InputDecoration(
-                  hintText: 'Opsi 1',
+              TextField(controller: option1Controller,
+                decoration: InputDecoration(hintText: 'Opsi 1',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
               const SizedBox(height: 10),
-              TextField(
-                controller: option2Controller,
-                decoration: InputDecoration(
-                  hintText: 'Opsi 2',
+              TextField(controller: option2Controller,
+                decoration: InputDecoration(hintText: 'Opsi 2',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -553,7 +473,14 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                   ),
                   onPressed: () {
                     Navigator.pop(context);
-                    setState(() => _messages.add({'isPoll': true, 'time': '16:35'}));
+                    final newPollId = '${widget.community.id}_poll_${DateTime.now().millisecondsSinceEpoch}';
+                    setState(() => _messages.add({
+                      'id': newPollId,
+                      'communityId': widget.community.id,
+                      'isPoll': true,
+                      'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+                      'type': 'poll',
+                    }));
                   },
                   child: const Text('Buat Poll', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),

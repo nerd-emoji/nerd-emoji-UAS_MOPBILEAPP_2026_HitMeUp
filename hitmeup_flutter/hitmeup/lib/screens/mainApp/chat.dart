@@ -12,6 +12,69 @@ import 'direct_chat_screen.dart';
 import 'chat_models.dart';
 import '../../theme/app_theme.dart';
 
+// Chat data provider class
+class ChatDataProvider {
+  // Centralized direct chat data
+  static final Map<String, List<Map<String, dynamic>>> directChatData = {
+    'dm_user_001': [
+      {'id': 'dm001_001', 'chatId': 'dm_user_001', 'senderId': 'user_siti', 'text': 'Halo! Apa kabar?', 'isMe': false, 'time': '09:00', 'sender': 'Siti Ratmawati', 'type': 'text'},
+      {'id': 'dm001_002', 'chatId': 'dm_user_001', 'senderId': 'me', 'text': 'Kabar baik! Kamu gimana?', 'isMe': true, 'time': '09:05', 'type': 'text'},
+      {'id': 'dm001_003', 'chatId': 'dm_user_001', 'senderId': 'user_siti', 'text': 'Alhamdulillah baik juga', 'isMe': false, 'time': '09:06', 'sender': 'Siti Ratmawati', 'type': 'text'},
+      {'id': 'dm001_004', 'chatId': 'dm_user_001', 'senderId': 'me', 'text': 'Mau jalan-jalan nggak hari ini?', 'isMe': true, 'time': '09:10', 'type': 'text'},
+      {'id': 'dm001_005', 'chatId': 'dm_user_001', 'senderId': 'user_siti', 'text': 'Mau dong! Mau ke mana?', 'isMe': false, 'time': '09:12', 'sender': 'Siti Ratmawati', 'type': 'text'},
+    ],
+    'dm_user_002': [
+      {'id': 'dm002_001', 'chatId': 'dm_user_002', 'senderId': 'user_budi', 'text': 'Bro, tugas matematika udah selesai?', 'isMe': false, 'time': '14:00', 'sender': 'Budi Amman', 'type': 'text'},
+      {'id': 'dm002_002', 'chatId': 'dm_user_002', 'senderId': 'me', 'text': 'Belum bro, lagi bingung nomor 5', 'isMe': true, 'time': '14:05', 'type': 'text'},
+      {'id': 'dm002_003', 'chatId': 'dm_user_002', 'senderId': 'user_budi', 'text': 'Sama bro, kita diskusi bareng yuk', 'isMe': false, 'time': '14:06', 'sender': 'Budi Amman', 'type': 'text'},
+      {'id': 'dm002_004', 'chatId': 'dm_user_002', 'senderId': 'me', 'text': 'Oke, jam 3 sore di perpustakaan?', 'isMe': true, 'time': '14:10', 'type': 'text'},
+      {'id': 'dm002_005', 'chatId': 'dm_user_002', 'senderId': 'user_budi', 'text': 'Siap!', 'isMe': false, 'time': '14:11', 'sender': 'Budi Amman', 'type': 'text'},
+    ],
+  };
+
+  // Centralized community chat data
+  static final Map<String, List<Map<String, dynamic>>> communityChatData = {
+    'comm_001': [
+      {'id': 'cm001_001', 'communityId': 'comm_001', 'senderId': 'user_rosia', 'text': 'Malam ini mau mabar ga?', 'isMe': false, 'sender': 'Rosia morens', 'time': '16:07', 'type': 'text'},
+      {'id': 'cm001_002', 'communityId': 'comm_001', 'senderId': 'user_petra', 'text': 'wii boleh tu, ayoo', 'isMe': false, 'sender': 'Petra', 'time': '16:10', 'type': 'text'},
+      {'id': 'cm001_003', 'communityId': 'comm_001', 'senderId': 'user_kiranti', 'text': 'enaknya jam berapa ya?', 'isMe': false, 'sender': 'Kiranti', 'time': '16:18', 'type': 'text'},
+      {'id': 'cm001_004', 'communityId': 'comm_001', 'senderId': 'me', 'text': 'Jam 21.00, bagaimana?', 'isMe': true, 'sender': '', 'time': '16:26', 'type': 'text'},
+      {'id': 'cm001_005', 'communityId': 'comm_001', 'senderId': 'user_rosia', 'text': 'Bolehhh tu', 'isMe': false, 'sender': 'Rosia morens', 'time': '16:28', 'type': 'text'},
+      {'id': 'cm001_poll_001', 'communityId': 'comm_001', 'isPoll': true, 'time': '16:30', 'type': 'poll'},
+      {'id': 'cm001_006', 'communityId': 'comm_001', 'senderId': 'me', 'text': 'Gass ramaikan!!', 'isMe': true, 'sender': '', 'time': '16:31', 'type': 'text'},
+      {'id': 'cm001_007', 'communityId': 'comm_001', 'senderId': 'user_vania', 'text': 'Iya nih sudah lama tidak mabar', 'isMe': false, 'sender': 'Vania kursel', 'time': '17:00', 'type': 'text'},
+      {'id': 'cm001_008', 'communityId': 'comm_001', 'senderId': 'user_yuqi', 'text': 'Maaf ya teman - teman tidak bisa ikut dulu', 'isMe': false, 'sender': 'Yuqi nako', 'time': '18:10', 'type': 'text'},
+    ],
+    'comm_002': [
+      {'id': 'cm002_001', 'communityId': 'comm_002', 'senderId': 'user_ana', 'text': 'Ada yang udah nonton Kafir: Gerbang Sukma?', 'isMe': false, 'sender': 'Ana', 'time': '19:00', 'type': 'text'},
+      {'id': 'cm002_002', 'communityId': 'comm_002', 'senderId': 'me', 'text': 'Udah! Serem banget bagian akhirnya', 'isMe': true, 'sender': '', 'time': '19:02', 'type': 'text'},
+      {'id': 'cm002_003', 'communityId': 'comm_002', 'senderId': 'user_deni', 'text': 'Gue belum, ga ada yang mau nemenin nonton', 'isMe': false, 'sender': 'Deni', 'time': '19:05', 'type': 'text'},
+      {'id': 'cm002_004', 'communityId': 'comm_002', 'senderId': 'user_ana', 'text': 'Nonton bareng yuk! Sabtu gimana?', 'isMe': false, 'sender': 'Ana', 'time': '19:06', 'type': 'text'},
+      {'id': 'cm002_005', 'communityId': 'comm_002', 'senderId': 'me', 'text': 'Sabtu oke! Di Blok M Plaza aja', 'isMe': true, 'sender': '', 'time': '19:08', 'type': 'text'},
+      {'id': 'cm002_006', 'communityId': 'comm_002', 'senderId': 'user_deni', 'text': 'Siap! Jam berapa?', 'isMe': false, 'sender': 'Deni', 'time': '19:09', 'type': 'text'},
+    ],
+    'comm_003': [
+      {'id': 'cm003_001', 'communityId': 'comm_003', 'senderId': 'user_rio', 'text': 'Ada yang mau collab bikin konten bareng?', 'isMe': false, 'sender': 'Rio', 'time': '14:00', 'type': 'text'},
+      {'id': 'cm003_002', 'communityId': 'comm_003', 'senderId': 'me', 'text': 'Mau! Konten apa yang mau dibuat?', 'isMe': true, 'sender': '', 'time': '14:05', 'type': 'text'},
+      {'id': 'cm003_003', 'communityId': 'comm_003', 'senderId': 'user_rio', 'text': 'Dance challenge yang lagi viral itu loh', 'isMe': false, 'sender': 'Rio', 'time': '14:06', 'type': 'text'},
+      {'id': 'cm003_004', 'communityId': 'comm_003', 'senderId': 'user_mia', 'text': 'Ih aku mau ikut juga dong!', 'isMe': false, 'sender': 'Mia', 'time': '14:10', 'type': 'text'},
+      {'id': 'cm003_005', 'communityId': 'comm_003', 'senderId': 'me', 'text': 'Ayo makin rame makin seru!', 'isMe': true, 'sender': '', 'time': '14:11', 'type': 'text'},
+    ],
+    'comm_004': [
+      {'id': 'cm004_001', 'communityId': 'comm_004', 'senderId': 'user_bro', 'text': 'Siapa yang rank diamond ke atas?', 'isMe': false, 'sender': 'Bro', 'time': '20:00', 'type': 'text'},
+      {'id': 'cm004_002', 'communityId': 'comm_004', 'senderId': 'me', 'text': 'Gue platinum, bisa join ga?', 'isMe': true, 'time': '20:01', 'type': 'text'},
+      {'id': 'cm004_003', 'communityId': 'comm_004', 'senderId': 'user_bro', 'text': 'Boleh, asal jangan feeding ya wkwk', 'isMe': false, 'sender': 'Bro', 'time': '20:02', 'type': 'text'},
+      {'id': 'cm004_004', 'communityId': 'comm_004', 'senderId': 'me', 'text': 'Siap bos! Ready kapanpun', 'isMe': true, 'time': '20:03', 'type': 'text'},
+    ],
+    'comm_005': [
+      {'id': 'cm005_001', 'communityId': 'comm_005', 'senderId': 'user_kevin', 'text': 'Besok pagi ada slot kosong di lapangan GBK jam 7', 'isMe': false, 'sender': 'Kevin', 'time': '21:00', 'type': 'text'},
+      {'id': 'cm005_002', 'communityId': 'comm_005', 'senderId': 'me', 'text': 'Wah oke banget! Siapa yang mau join?', 'isMe': true, 'sender': '', 'time': '21:01', 'type': 'text'},
+      {'id': 'cm005_003', 'communityId': 'comm_005', 'senderId': 'user_tari', 'text': 'Aku mau! Udah lama ga main padel', 'isMe': false, 'sender': 'Tari', 'time': '21:02', 'type': 'text'},
+      {'id': 'cm005_004', 'communityId': 'comm_005', 'senderId': 'user_kevin', 'text': 'Oke kita berempat cukup, gas!', 'isMe': false, 'sender': 'Kevin', 'time': '21:03', 'type': 'text'},
+    ],
+  };
+}
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -26,33 +89,39 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final List<_CommunityItemData> _communities = const [
     _CommunityItemData(
+      id: 'comm_001',
       title: 'Rblx Geng',
       participants: '75 Participants',
       imageUrl: 'https://i.pravatar.cc/240?img=11',
     ),
     _CommunityItemData(
+      id: 'comm_002',
       title: 'Penyuka Horror',
       participants: '24 Participants',
       imageUrl: 'https://i.pravatar.cc/240?img=24',
     ),
     _CommunityItemData(
+      id: 'comm_003',
       title: 'Tiktokers',
       participants: '48 Participants',
       imageUrl: 'https://i.pravatar.cc/240?img=41',
     ),
     _CommunityItemData(
+      id: 'comm_004',
       title: 'Mabar ff',
       participants: '50 Participants',
       icon: Icons.groups_rounded,
       iconBackground: Color(0xFFF53D84),
     ),
     _CommunityItemData(
+      id: 'comm_005',
       title: 'Main Padel Yuk!',
       participants: '15 Participants',
       icon: Icons.groups_rounded,
       iconBackground: Color(0xFFF53D84),
     ),
     _CommunityItemData(
+      id: 'create_new',
       title: 'Create a new\ncommunity',
       participants: '',
       icon: Icons.add,
@@ -60,15 +129,17 @@ class _ChatScreenState extends State<ChatScreen> {
     ),
   ];
 
-  final List<_ChatPreviewData> _recentChats = const [
+  List<_ChatPreviewData> get _recentChats => [
     _ChatPreviewData(
+      id: 'dm_user_001',
       name: 'Siti Ratmawati',
-      message: 'Baiklah, see you Alfraz',
+      message: ChatDataProvider.directChatData['dm_user_001']!.last['text'] as String,
       avatarUrl: 'https://i.pravatar.cc/160?img=44',
     ),
     _ChatPreviewData(
+      id: 'dm_user_002',
       name: 'Budi Amman',
-      message: 'WAHHH PANTESAN HAHAHHA',
+      message: ChatDataProvider.directChatData['dm_user_002']!.last['text'] as String,
       avatarUrl: 'https://i.pravatar.cc/160?img=13',
     ),
   ];
@@ -252,6 +323,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           MaterialPageRoute(
                             builder: (_) => DirectChatScreen(
                               chat: DirectChat(
+                                id: chat.id,
                                 name: chat.name,
                                 lastMessage: chat.message,
                                 avatarUrl: chat.avatarUrl,
@@ -281,6 +353,7 @@ class _ChatScreenState extends State<ChatScreen> {
         MaterialPageRoute(
           builder: (_) => CommunityChatScreen(
             community: Community(
+              id: data.id,
               name: data.title,
               participants: int.tryParse(
                     data.participants.replaceAll(RegExp(r'[^0-9]'), ''),
@@ -458,6 +531,7 @@ class _RecentChatTile extends StatelessWidget {
 
 class _CommunityItemData {
   const _CommunityItemData({
+    required this.id,
     required this.title,
     required this.participants,
     this.imageUrl,
@@ -465,6 +539,7 @@ class _CommunityItemData {
     this.iconBackground,
   });
 
+  final String id;
   final String title;
   final String participants;
   final String? imageUrl;
@@ -474,14 +549,27 @@ class _CommunityItemData {
 
 class _ChatPreviewData {
   const _ChatPreviewData({
+    required this.id,
     required this.name,
     required this.message,
     required this.avatarUrl,
   });
 
+  final String id;
   final String name;
   final String message;
   final String avatarUrl;
+
+  static String getLastMessage(String chatId) {
+    switch (chatId) {
+      case 'dm_user_001':
+        return 'Baiklah, see you Alfraz';
+      case 'dm_user_002':
+        return 'Jadi dong! Jam 4 di lapangan biasa ya';
+      default:
+        return 'Halo juga!';
+    }
+  }
 }
 
 class _BottomNavBar extends StatelessWidget {

@@ -1,7 +1,4 @@
-<<<<<<< HEAD:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
-=======
 import 'package:flutter/cupertino.dart';
->>>>>>> b08e7bd95fdc7cd8a471cf7b3f92860581c8f222:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 
@@ -27,31 +24,18 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
 	late TextEditingController _nameController;
-<<<<<<< HEAD:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
-	late TextEditingController _birthdayController;
-	late TextEditingController _genderController;
-	late TextEditingController _locationController;
-	late List<TextEditingController> _interestControllers;
-=======
 	late TextEditingController _genderController;
 	late TextEditingController _locationController;
 	late List<TextEditingController> _interestControllers;
 	late DateTime _selectedBirthday;
->>>>>>> b08e7bd95fdc7cd8a471cf7b3f92860581c8f222:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
 
 	@override
 	void initState() {
 		super.initState();
 		_nameController = TextEditingController(text: widget.initialName);
-<<<<<<< HEAD:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
-		_birthdayController = TextEditingController(text: widget.initialBirthday);
-		_genderController = TextEditingController(text: widget.initialGender);
-		_locationController = TextEditingController(text: widget.initialLocation);
-=======
 		_genderController = TextEditingController(text: widget.initialGender);
 		_locationController = TextEditingController(text: widget.initialLocation);
 		_selectedBirthday = _parseBirthday(widget.initialBirthday);
->>>>>>> b08e7bd95fdc7cd8a471cf7b3f92860581c8f222:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
 		_interestControllers = widget.initialInterests
 			.map((interest) => TextEditingController(text: interest))
 			.toList();
@@ -60,10 +44,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 	@override
 	void dispose() {
 		_nameController.dispose();
-<<<<<<< HEAD:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
-		_birthdayController.dispose();
-=======
->>>>>>> b08e7bd95fdc7cd8a471cf7b3f92860581c8f222:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
 		_genderController.dispose();
 		_locationController.dispose();
 		for (var controller in _interestControllers) {
@@ -165,14 +145,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 											const SizedBox(height: 16),
 
 											// Birthday Field
-<<<<<<< HEAD:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
-											_buildInputField(
-												controller: _birthdayController,
-												label: 'Birthday date',
-											),
-=======
 											_buildBirthdayField(),
->>>>>>> b08e7bd95fdc7cd8a471cf7b3f92860581c8f222:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
 											const SizedBox(height: 10),
 
 											// Gender Field
@@ -330,8 +303,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 		);
 	}
 
-<<<<<<< HEAD:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
-=======
 	Widget _buildBirthdayField() {
 		return Row(
 			children: [
@@ -448,16 +419,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 		return '${value.year}-$month-$day';
 	}
 
->>>>>>> b08e7bd95fdc7cd8a471cf7b3f92860581c8f222:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
 	void _savProfile() {
 		// Collect all the edited data
 		final updatedData = {
 			'name': _nameController.text,
-<<<<<<< HEAD:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
-			'birthday': _birthdayController.text,
-=======
 			'birthday': _formatBirthday(_selectedBirthday),
->>>>>>> b08e7bd95fdc7cd8a471cf7b3f92860581c8f222:MobileApps_HitMeUp-main/MobileApps_HitMeUp-main/hitmeup_flutter/hitmeup/lib/screens/mainApp/editProfile.dart
 			'gender': _genderController.text,
 			'location': _locationController.text,
 			'interests': _interestControllers.map((c) => c.text).toList(),
