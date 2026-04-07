@@ -1,48 +1,968 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
+
+import '../../services/auth_session.dart';
+import '../../services/chat_service.dart';
 import '../../theme/app_theme.dart';
 
 class AiChatScreen extends StatefulWidget {
-  const AiChatScreen({super.key});
+  const AiChatScreen({
+    super.key,
+    this.contextUserId,
+    this.contextCommunityId,
+    this.contextTitle,
+  });
+
+  final int? contextUserId;
+  final int? contextCommunityId;
+  final String? contextTitle;
 
   @override
   State<AiChatScreen> createState() => _AiChatScreenState();
 }
 
 class _AiChatScreenState extends State<AiChatScreen> {
+  static const int _messagePageSize = 20;
+  static const double _topLoadThreshold = 120.0;
+  static const String _galleryPermissionMessage =
+      'Please allow gallery access so you can choose an image to send.';
+  static const String _microphonePermissionMessage =
+      'Please allow microphone access so you can record voice messages.';
+
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  final ImagePicker _imagePicker = ImagePicker();
+
   bool _showAttachMenu = false;
+  bool _isLoading = true;
+  bool _isInitializingChat = true;
+  bool _isSending = false;
+  bool _isPickingImage = false;
+  bool _isLoadingMoreMessages = false;
+  bool _hasMoreOlderMessages = true;
+  bool _isRecordingVoice = false;
+  bool _isSendingVoice = false;
+  Duration _voiceRecordDuration = Duration.zero;
+  Timer? _voiceRecordTimer;
+  String? _playingVoiceUrl;
+  bool _isVoicePlaying = false;
 
-  final List<Map<String, dynamic>> _messages = [
-    {
-      'text': 'Hi AI, boleh tolong rekomendasikan saya outlet matcha yang enak dengan range harga 40K - 80K di sekitar blok m?',
-      'isMe': true,
-    },
-    {
-      'text': 'Tentu saja! Saya akan buatkan opsi untuk kamu memilih outlet matcha yang enak dengan range harga 40K - 80K di daerah blok m:',
-      'isMe': false,
-      'hasPlaces': true,
-    },
-    {'text': 'terimakasih, sangat membantu!', 'isMe': true},
-    {'text': 'Dan juga, bantu aku cari kegiatan bareng siti untuk sehabis minum matcha!', 'isMe': true},
-    {
-      'text': 'Berdasarkan genre film kesukaan kalian yaitu horror, berikut rekomendasi film horror yang sedang tayang di bioskop daerah Blok M',
-      'isMe': false,
-      'hasMovies': true,
-    },
-  ];
+  int? _aiChatId;
+  List<Map<String, dynamic>> _messages = [];
+  String? _mainUserProfileUrl;
 
-  final List<Map<String, String>> _places = [
-    {'name': 'MATCHAMAN', 'type': 'Kedai Teh', 'address': 'Blok M, Kota Jakarta Selatan', 'review': '"Rasanya mirip senye literatur!"', 'image': 'https://i.pravatar.cc/60?img=1'},
-    {'name': 'MADMATCHA', 'type': 'Kedai Kopi', 'address': 'Blok M, Kota Jakarta Selatan', 'review': '"Enak, tapi porsinya kurang"', 'image': 'https://i.pravatar.cc/60?img=2'},
-    {'name': 'MATTEA SOCIAL SPACE', 'type': 'Kedai Kopi', 'address': 'Blok M, Kota Jakarta Selatan', 'review': '"Sukai semua menu"', 'image': 'https://i.pravatar.cc/60?img=3'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_handleScroll);
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (!mounted) {
+        return;
+      }
 
-  final List<Map<String, String>> _movies = [
-    {'title': 'WHISTLE', 'genre': 'Horror', 'image': 'https://image.tmdb.org/t/p/w200/1E5baAaEse26fej7uHcjOgEE2t2.jpg'},
-    {'title': 'KAFIR, GERBANG SUKMA', 'genre': 'Horror', 'image': 'https://image.tmdb.org/t/p/w200/qNBAXBIQlnOThrVvA6mA2B5ggV6.jpg'},
-    {'title': 'LIFT', 'genre': 'Horror', 'image': 'https://image.tmdb.org/t/p/w200/rzdPqYx7Um4FUZeD8wpXqjAUcEr.jpg'},
-  ];
+      setState(() {
+        _isVoicePlaying = state == PlayerState.playing;
+        if (state == PlayerState.stopped) {
+          _playingVoiceUrl = null;
+        }
+      });
+    });
+    _audioPlayer.onPlayerComplete.listen((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isVoicePlaying = false;
+        _playingVoiceUrl = null;
+      });
+    });
+    _initializeChat();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _voiceRecordTimer?.cancel();
+    unawaited(_audioRecorder.cancel());
+    unawaited(_audioRecorder.dispose());
+    unawaited(_audioPlayer.stop());
+    unawaited(_audioPlayer.dispose());
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    if (_scrollController.position.pixels <= _topLoadThreshold) {
+      _loadOlderMessages();
+    }
+  }
+
+  String _screenSubtitle() {
+    final title = widget.contextTitle?.trim();
+    if (title != null && title.isNotEmpty) {
+      return title;
+    }
+    if (widget.contextUserId != null) {
+      return 'AI chat in direct context';
+    }
+    if (widget.contextCommunityId != null) {
+      return 'AI chat in community context';
+    }
+    return 'Personal AI chat';
+  }
+
+  String? _resolveProfileUrl(dynamic rawPath) {
+    final value = (rawPath ?? '').toString().trim();
+    if (value.isEmpty) {
+      return null;
+    }
+    return _resolveMediaUrl(value);
+  }
+
+  Future<void> _loadMainUserProfile(int userId) async {
+    final cachedUser = AuthSession.instance.currentUser;
+    final cachedProfileUrl = _resolveProfileUrl(cachedUser?['profilepicture']);
+    if (cachedProfileUrl != null && mounted) {
+      setState(() {
+        _mainUserProfileUrl = cachedProfileUrl;
+      });
+    }
+
+    try {
+      final userData = await ChatService.fetchUser(userId);
+      final freshProfileUrl = _resolveProfileUrl(userData['profilepicture']);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _mainUserProfileUrl = freshProfileUrl;
+      });
+
+      final mergedUser = <String, dynamic>{
+        ...?cachedUser,
+        ...userData,
+      };
+      unawaited(AuthSession.instance.saveUser(mergedUser));
+    } catch (_) {
+      // Keep cached avatar if user fetch fails.
+    }
+  }
+
+  Future<void> _initializeChat() async {
+    final userId = AuthSession.instance.userId;
+    if (userId == null) {
+      if (mounted) {
+        setState(() {
+          _isInitializingChat = false;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not logged in')),
+        );
+      }
+      return;
+    }
+
+    unawaited(_loadMainUserProfile(userId));
+
+    try {
+      final aiChat = await ChatService.ensureAiChat(
+        mainUserId: userId,
+        contextUserId: widget.contextUserId,
+        contextCommunityId: widget.contextCommunityId,
+      );
+
+      final chatId = aiChat['id'] is int
+          ? aiChat['id'] as int
+          : int.tryParse(aiChat['id'].toString());
+      if (chatId == null) {
+        throw Exception('Invalid AI chat id received from server.');
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _aiChatId = chatId;
+        _isInitializingChat = false;
+      });
+
+      await _loadMessages();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isInitializingChat = false;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to initialize AI chat: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    final chatId = _aiChatId;
+    if (chatId == null) {
+      return;
+    }
+
+    try {
+      final messages = await ChatService.fetchAiMessages(
+        chatId,
+        limit: _messagePageSize,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _messages = messages;
+        _isLoading = false;
+        _hasMoreOlderMessages = messages.length == _messagePageSize;
+      });
+      _scrollToBottomUntilStable();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading AI messages: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadOlderMessages() async {
+    final chatId = _aiChatId;
+    if (chatId == null || _isLoading || _isLoadingMoreMessages || !_hasMoreOlderMessages || _messages.isEmpty) {
+      return;
+    }
+
+    final oldestMessageId = _messageIdFromMessage(_messages.first);
+    if (oldestMessageId == null) {
+      return;
+    }
+
+    final oldPixels = _scrollController.hasClients ? _scrollController.position.pixels : 0.0;
+    final oldMaxScrollExtent = _scrollController.hasClients ? _scrollController.position.maxScrollExtent : 0.0;
+
+    setState(() {
+      _isLoadingMoreMessages = true;
+    });
+
+    try {
+      final olderMessages = await ChatService.fetchAiMessages(
+        chatId,
+        limit: _messagePageSize,
+        beforeId: oldestMessageId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        if (olderMessages.isNotEmpty) {
+          _messages = [...olderMessages, ..._messages];
+        }
+        _hasMoreOlderMessages = olderMessages.length == _messagePageSize;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) {
+          return;
+        }
+
+        final newMaxScrollExtent = _scrollController.position.maxScrollExtent;
+        final delta = newMaxScrollExtent - oldMaxScrollExtent;
+        final targetOffset = oldPixels + delta;
+        _scrollController.jumpTo(targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent));
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading older AI messages: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMoreMessages = false;
+        });
+      }
+    }
+  }
+
+  int? _messageIdFromMessage(Map<String, dynamic> message) {
+    final idValue = message['id'];
+    if (idValue is int) {
+      return idValue;
+    }
+    return int.tryParse(idValue.toString());
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+
+    final userId = AuthSession.instance.userId;
+    final chatId = _aiChatId;
+    if (userId == null || chatId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not logged in or AI chat unavailable')),
+      );
+      return;
+    }
+
+    _controller.clear();
+    setState(() => _isSending = true);
+
+    try {
+      final userMessage = await ChatService.sendAiMessage(
+        chatId: chatId,
+        senderId: userId,
+        text: text,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _messages.add(userMessage);
+        _isSending = false;
+      });
+      _scrollToBottomWithSettling();
+
+      await _sendAssistantReplyFor();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending AI message: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _sendAssistantReplyFor() async {
+    final chatId = _aiChatId;
+    if (chatId == null) {
+      return;
+    }
+
+    try {
+      final aiMessage = await ChatService.generateAiReply(
+        chatId: chatId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _messages.add(aiMessage);
+      });
+      _scrollToBottomWithSettling();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate AI reply: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndSendGalleryImage() async {
+    if (_isPickingImage) {
+      return;
+    }
+
+    if (_showAttachMenu) {
+      setState(() {
+        _showAttachMenu = false;
+      });
+    }
+
+    try {
+      final hasPermission = await _ensureGalleryPermission();
+      if (!hasPermission || !mounted) {
+        return;
+      }
+
+      setState(() {
+        _isPickingImage = true;
+      });
+
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1440,
+      );
+
+      if (pickedFile == null || !mounted) {
+        return;
+      }
+
+      final userId = AuthSession.instance.userId;
+      final chatId = _aiChatId;
+      if (userId == null || chatId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not logged in or AI chat unavailable')),
+        );
+        return;
+      }
+
+      final imageBytes = await pickedFile.readAsBytes();
+      final sentMessage = await ChatService.sendAiImageMessage(
+        chatId: chatId,
+        senderId: userId,
+        imageBytes: imageBytes,
+        fileName: pickedFile.name,
+      );
+
+      if (mounted) {
+        setState(() {
+          _messages.add(sentMessage);
+        });
+        _scrollToBottomWithSettling();
+      }
+
+      await _sendAssistantReplyFor();
+    } on MissingPluginException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image picker plugin is not available on this platform.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send image: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingImage = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndSendCameraImage() async {
+    if (_isPickingImage) {
+      return;
+    }
+
+    if (_showAttachMenu) {
+      setState(() {
+        _showAttachMenu = false;
+      });
+    }
+
+    try {
+      setState(() {
+        _isPickingImage = true;
+      });
+
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1440,
+      );
+
+      if (pickedFile == null || !mounted) {
+        return;
+      }
+
+      final userId = AuthSession.instance.userId;
+      final chatId = _aiChatId;
+      if (userId == null || chatId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not logged in or AI chat unavailable')),
+        );
+        return;
+      }
+
+      final imageBytes = await pickedFile.readAsBytes();
+      final sentMessage = await ChatService.sendAiImageMessage(
+        chatId: chatId,
+        senderId: userId,
+        imageBytes: imageBytes,
+        fileName: pickedFile.name,
+      );
+
+      if (mounted) {
+        setState(() {
+          _messages.add(sentMessage);
+        });
+        _scrollToBottomWithSettling();
+      }
+
+      await _sendAssistantReplyFor();
+    } on MissingPluginException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Camera plugin is not available on this platform.')),
+        );
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open camera: ${e.message ?? e.code}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to capture image: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingImage = false;
+        });
+      }
+    }
+  }
+
+  Future<bool> _ensureGalleryPermission() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      var photosStatus = await Permission.photos.status;
+      if (photosStatus.isGranted || photosStatus.isLimited) {
+        return true;
+      }
+      if (photosStatus.isDenied || photosStatus.isRestricted) {
+        photosStatus = await Permission.photos.request();
+      }
+      if (photosStatus.isGranted || photosStatus.isLimited) {
+        return true;
+      }
+
+      var storageStatus = await Permission.storage.status;
+      if (storageStatus.isGranted) {
+        return true;
+      }
+      if (storageStatus.isDenied || storageStatus.isRestricted) {
+        storageStatus = await Permission.storage.request();
+      }
+      if (storageStatus.isGranted) {
+        return true;
+      }
+
+      return _showGalleryPermissionSettingsDialog();
+    }
+
+    var status = await Permission.photos.status;
+    if (status.isGranted || status.isLimited) {
+      return true;
+    }
+    if (status.isDenied || status.isRestricted) {
+      status = await Permission.photos.request();
+    }
+    if (status.isGranted || status.isLimited) {
+      return true;
+    }
+
+    return _showGalleryPermissionSettingsDialog();
+  }
+
+  Future<bool> _showGalleryPermissionSettingsDialog() async {
+    final shouldOpenSettings = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Gallery permission needed'),
+          content: const Text(_galleryPermissionMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Open settings'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldOpenSettings == true) {
+      try {
+        await openAppSettings();
+      } on MissingPluginException {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Settings cannot be opened on this platform.')),
+          );
+        }
+      }
+    }
+
+    return false;
+  }
+
+  Future<bool> _ensureMicrophonePermission() async {
+    var status = await Permission.microphone.status;
+    if (status.isGranted) {
+      return true;
+    }
+    if (status.isDenied || status.isRestricted) {
+      status = await Permission.microphone.request();
+    }
+    if (status.isGranted) {
+      return true;
+    }
+
+    return _showMicrophonePermissionSettingsDialog();
+  }
+
+  Future<bool> _showMicrophonePermissionSettingsDialog() async {
+    final shouldOpenSettings = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Microphone permission needed'),
+          content: const Text(_microphonePermissionMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Open settings'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldOpenSettings == true) {
+      try {
+        await openAppSettings();
+      } on MissingPluginException {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Settings cannot be opened on this platform.')),
+          );
+        }
+      }
+    }
+
+    return false;
+  }
+
+  Future<void> _startVoiceRecording() async {
+    if (_isRecordingVoice || _isSendingVoice || _isSending) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    final hasPermission = await _ensureMicrophonePermission();
+    if (!hasPermission || !mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required to record voice messages.')),
+        );
+      }
+      return;
+    }
+
+    final canRecord = await _audioRecorder.hasPermission();
+    if (!canRecord || !mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to access microphone.')),
+        );
+      }
+      return;
+    }
+
+    if (_showAttachMenu) {
+      setState(() {
+        _showAttachMenu = false;
+      });
+    }
+
+    try {
+      final recordingPath =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}ai_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
+      await _audioRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: recordingPath,
+      );
+
+      _voiceRecordTimer?.cancel();
+      setState(() {
+        _isRecordingVoice = true;
+        _voiceRecordDuration = Duration.zero;
+      });
+
+      _voiceRecordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || !_isRecordingVoice) {
+          return;
+        }
+        setState(() {
+          _voiceRecordDuration += const Duration(seconds: 1);
+        });
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start recording: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteVoiceRecording() async {
+    try {
+      if (await _audioRecorder.isRecording()) {
+        await _audioRecorder.cancel();
+      }
+    } catch (_) {
+      // Best effort cleanup.
+    }
+
+    _voiceRecordTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _isRecordingVoice = false;
+        _isSendingVoice = false;
+        _voiceRecordDuration = Duration.zero;
+      });
+    }
+  }
+
+  Future<void> _sendVoiceRecording() async {
+    if (!_isRecordingVoice || _isSendingVoice) {
+      return;
+    }
+
+    final userId = AuthSession.instance.userId;
+    final chatId = _aiChatId;
+    if (userId == null || chatId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not logged in or AI chat unavailable')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSendingVoice = true;
+    });
+
+    try {
+      final path = await _audioRecorder.stop();
+      _voiceRecordTimer?.cancel();
+
+      if (path == null || path.isEmpty) {
+        throw Exception('No recording captured.');
+      }
+
+      final audioBytes = await File(path).readAsBytes();
+      final fileName = path.split(Platform.pathSeparator).last;
+
+      final sentMessage = await ChatService.sendAiVoiceMessage(
+        chatId: chatId,
+        senderId: userId,
+        audioBytes: audioBytes,
+        fileName: fileName,
+      );
+
+      if (mounted) {
+        setState(() {
+          _messages.add(sentMessage);
+          _isRecordingVoice = false;
+          _isSendingVoice = false;
+          _voiceRecordDuration = Duration.zero;
+        });
+        _scrollToBottomWithSettling();
+      }
+
+      await _sendAssistantReplyFor();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isRecordingVoice = false;
+          _isSendingVoice = false;
+          _voiceRecordDuration = Duration.zero;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send voice recording: $e')),
+        );
+      }
+    }
+  }
+
+  String _resolveMediaUrl(String rawUrl) {
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return rawUrl;
+    }
+    if (rawUrl.startsWith('/')) {
+      return '${ChatService.baseUrl}$rawUrl';
+    }
+    return '${ChatService.baseUrl}/$rawUrl';
+  }
+
+  Future<void> _toggleVoicePlayback(String rawVoiceUrl) async {
+    final resolvedUrl = _resolveMediaUrl(rawVoiceUrl);
+    try {
+      if (_playingVoiceUrl == resolvedUrl && _isVoicePlaying) {
+        await _audioPlayer.pause();
+        return;
+      }
+
+      await _audioPlayer.stop();
+      final response = await http.get(Uri.parse(resolvedUrl)).timeout(
+        const Duration(seconds: 15),
+      );
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+        throw Exception('Voice file could not be loaded (${response.statusCode}).');
+      }
+
+      setState(() {
+        _playingVoiceUrl = resolvedUrl;
+      });
+      await _audioPlayer.play(BytesSource(response.bodyBytes));
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Voice playback request timed out.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to play voice message: $e')),
+        );
+      }
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  void _scrollToBottom({bool animated = true}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) {
+        return;
+      }
+
+      final target = _scrollController.position.maxScrollExtent;
+      if (animated) {
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(target);
+      }
+    });
+  }
+
+  void _scrollToBottomWithSettling() {
+    _scrollToBottom();
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) {
+        _scrollToBottom(animated: false);
+      }
+    });
+  }
+
+  void _scrollToBottomUntilStable({int maxAttempts = 8}) {
+    double previousExtent = -1;
+
+    void runAttempt(int attempt) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+
+      final currentExtent = _scrollController.position.maxScrollExtent;
+      _scrollController.jumpTo(currentExtent);
+
+      final isStable = (currentExtent - previousExtent).abs() < 1;
+      if (attempt >= maxAttempts || (attempt > 1 && isStable)) {
+        return;
+      }
+
+      previousExtent = currentExtent;
+      Future.delayed(const Duration(milliseconds: 140), () {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          runAttempt(attempt + 1);
+        });
+      });
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      runAttempt(1);
+    });
+  }
+
+  Map<String, dynamic> _toDisplayMessage(Map<String, dynamic> msg) {
+    final currentUserId = AuthSession.instance.userId;
+    final senderId = msg['sender'] is int
+        ? msg['sender'] as int
+        : int.tryParse(msg['sender']?.toString() ?? '');
+    final isFromAI = msg['isFromAI'] == true;
+    final isMe = !isFromAI && senderId != null && senderId == currentUserId;
+
+    return {
+      'id': msg['id'],
+      'text': msg['text'] ?? '',
+      'image': msg['image'] as String?,
+      'voiceRecording': msg['voiceRecording'] as String?,
+      'isMe': isMe,
+      'isFromAI': isFromAI,
+      'time': _formatTime(msg['created_at'] ?? ''),
+    };
+  }
+
+  String _formatTime(String dateTimeString) {
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      final hour = dateTime.hour.toString().padLeft(2, '0');
+      final minute = dateTime.minute.toString().padLeft(2, '0');
+      return '$hour:$minute';
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,8 +984,24 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 ),
                 child: Stack(
                   children: [
+                    if (_isInitializingChat || _isLoading)
+                      const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      )
+                    else
+                      ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          final rawMessage = _messages[index];
+                          return _buildMessage(_toDisplayMessage(rawMessage));
+                        },
+                      ),
                     Positioned(
-                      top: 0, left: 0, right: 0,
+                      top: 0,
+                      left: 0,
+                      right: 0,
                       child: Container(
                         height: 16,
                         decoration: const BoxDecoration(
@@ -77,103 +1013,101 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         ),
                       ),
                     ),
-                    ListView(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                      children: _messages.map((msg) => _buildMessage(msg)).toList(),
-                    ),
+                    if (_isLoadingMoreMessages)
+                      Positioned(
+                        top: 8,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.85),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text(
+                              'Loading older messages...',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
-            Container(
-              color: Colors.white,
-              padding: EdgeInsets.only(
-                left: 16, right: 16, top: 4,
-                bottom: MediaQuery.of(context).padding.bottom + 8,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                    child: _showAttachMenu
-                        ? AnimatedOpacity(
-                            opacity: 1.0,
-                            duration: const Duration(milliseconds: 300),
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [Color(0xFF448AFF), Colors.white, Color(0xFFFF4081)],
-                                  stops: [0.0, 0.5, 1.0],
-                                ),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildAttachItem(Icons.photo_library_rounded, 'Gallery'),
-                                  const SizedBox(height: 6),
-                                  _buildAttachItem(Icons.camera_alt_rounded, 'Camera'),
-                                  const SizedBox(height: 6),
-                                  _buildAttachItem(Icons.align_horizontal_left_rounded, 'Poll'),
-                                ],
-                              ),
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: Colors.grey.shade300),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_showAttachMenu && !_isRecordingVoice) const SizedBox(height: 86),
+                    Container(
+                      color: Colors.white,
+                      padding: EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: 4,
+                        bottom: MediaQuery.of(context).padding.bottom + 8,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: _isRecordingVoice ? _buildVoiceRecorderBar() : _buildTextInputBar(),
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => setState(() => _showAttachMenu = !_showAttachMenu),
-                          child: AnimatedRotation(
-                            turns: _showAttachMenu ? 0.125 : 0,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                            child: Container(
-                              width: 32, height: 32,
-                              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
-                              child: const Icon(Icons.add, size: 20, color: Colors.black),
-                            ),
+                  ],
+                ),
+                if (_showAttachMenu && !_isRecordingVoice)
+                  Positioned(
+                    bottom: 60 + MediaQuery.of(context).padding.bottom,
+                    left: 16,
+                    child: AnimatedOpacity(
+                      opacity: 1.0,
+                      duration: const Duration(milliseconds: 250),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFF448AFF), Color(0xFFFF4081)],
+                            stops: [0.5, 1.0],
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            decoration: const InputDecoration(
-                              hintText: 'Mau nanya apa nih ....',
-                              hintStyle: TextStyle(color: Colors.black38),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.mic, color: Colors.black, size: 24),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_upward, color: Colors.black, size: 24),
-                      ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildAttachItem(
+                              'assets/galleryIcon.png',
+                              'Gallery',
+                              onTap: _pickAndSendGalleryImage,
+                            ),
+                            const SizedBox(height: 6),
+                            _buildAttachItem(
+                              'assets/cameraIcon.png',
+                              'Camera',
+                              onTap: _pickAndSendCameraImage,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
           ],
         ),
@@ -185,7 +1119,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     return Padding(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top,
-        left: 8, right: 16, bottom: 8,
+        left: 8,
+        right: 16,
+        bottom: 8,
       ),
       child: Row(
         children: [
@@ -195,191 +1131,302 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ),
           Image.asset(
             'assets/AIBrain.png',
-            width: 28, height: 28,
+            width: 28,
+            height: 28,
             fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, size: 28, color: Colors.black),
           ),
           const SizedBox(width: 8),
-          const Text(
-            'Chat.AI',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-          const Spacer(),
-          const CircleAvatar(
-            radius: 20,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=12'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessage(Map<String, dynamic> msg) {
-    final isMe = msg['isMe'] as bool;
-    final hasPlaces = msg['hasPlaces'] as bool? ?? false;
-    final hasMovies = msg['hasMovies'] as bool? ?? false;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!isMe) ...[
-            Image.asset(
-              'assets/AIBrain.png',
-              width: 28, height: 28,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, size: 28, color: Colors.black54),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 16),
-                ),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2))],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(msg['text'], style: const TextStyle(fontSize: 13, color: Colors.black87)),
-                  if (hasPlaces) ...[const SizedBox(height: 12), _buildPlacesCard()],
-                  if (hasMovies) ...[const SizedBox(height: 12), _buildMoviesCard()],
-                ],
-              ),
-            ),
-          ),
-          if (isMe) ...[
-            const SizedBox(width: 8),
-            const CircleAvatar(
-              radius: 16,
-              backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=12'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlacesCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        children: [
-          ..._places.map((place) => Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    place['image']!, width: 50, height: 50, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 50, height: 50,
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.store, color: Colors.grey),
-                    ),
-                  ),
+                const Text(
+                  'Chat.AI',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(place['name']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
-                      Row(children: [
-                        ...List.generate(4, (_) => const Icon(Icons.star, size: 10, color: Colors.amber)),
-                        const Icon(Icons.star_half, size: 10, color: Colors.amber),
-                        const SizedBox(width: 4),
-                        Text(place['type']!, style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                      ]),
-                      Text(place['address']!, style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                      Text(place['review']!, style: const TextStyle(fontSize: 9, color: Colors.grey, fontStyle: FontStyle.italic)),
-                    ],
-                  ),
+                Text(
+                  _screenSubtitle(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
-          )),
-          Container(
-            height: 120,
-            margin: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(10)),
-            child: const Center(child: Icon(Icons.map_rounded, size: 48, color: Colors.grey)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMoviesCard() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildTextInputBar() {
+    return Row(
       children: [
-        const Text('Bioskop / BLOK M PLAZA:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: _movies.map((movie) => Column(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  movie['image']!, width: 75, height: 110, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 75, height: 110,
-                    color: Colors.grey.shade300,
-                    child: const Icon(Icons.movie, color: Colors.grey),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                width: 75,
-                child: Text(
-                  movie['title']!,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87),
-                ),
-              ),
-              Text(movie['genre']!, style: const TextStyle(fontSize: 9, color: Colors.grey)),
-            ],
-          )).toList(),
+        GestureDetector(
+          onTap: () => setState(() => _showAttachMenu = !_showAttachMenu),
+          child: AnimatedRotation(
+            turns: _showAttachMenu ? 0.125 : 0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.black, width: 2)),
+              child: const Icon(Icons.add, size: 20, color: Colors.black),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            decoration: const InputDecoration(
+              hintText: 'Ask Chat.AI anything...',
+              hintStyle: TextStyle(color: Colors.black38),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onSubmitted: (_) => _sendMessage(),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: _isSendingVoice ? null : _startVoiceRecording,
+          child: Icon(
+            Icons.mic,
+            color: _isSendingVoice ? Colors.black26 : Colors.black,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: _isSending ? null : _sendMessage,
+          child: Icon(
+            Icons.arrow_upward,
+            color: _isSending ? Colors.black26 : Colors.black,
+            size: 24,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildAttachItem(IconData icon, String label) {
-    return Container(
-      width: 99, height: 24,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.pinkTop.withOpacity(0.4), width: 1),
-      ),
+  Widget _buildVoiceRecorderBar() {
+    return Row(
+      children: [
+        const Icon(Icons.graphic_eq, color: Colors.redAccent, size: 22),
+        const SizedBox(width: 10),
+        Text(
+          _formatDuration(_voiceRecordDuration),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        ),
+        const Spacer(),
+        GestureDetector(
+          onTap: _deleteVoiceRecording,
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: _isSendingVoice ? null : _sendVoiceRecording,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.blueBottom,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Icon(
+              Icons.send_rounded,
+              color: _isSendingVoice ? Colors.white54 : Colors.white,
+              size: 18,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMessage(Map<String, dynamic> msg) {
+    final isMe = msg['isMe'] as bool;
+    final isFromAI = msg['isFromAI'] as bool? ?? false;
+    final text = msg['text'] as String? ?? '';
+    final time = msg['time'] as String? ?? '';
+    final imageUrl = msg['image'] as String?;
+    final voiceUrl = msg['voiceRecording'] as String?;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          const SizedBox(width: 8),
-          Icon(icon, size: 13, color: Colors.black87),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87)),
+          if (!isMe)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Image.asset(
+                'assets/AIBrain.png',
+                width: 28,
+                height: 28,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, size: 28, color: Colors.black54),
+              ),
+            ),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(14),
+                  topRight: const Radius.circular(14),
+                  bottomLeft: Radius.circular(isMe ? 14 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 14),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (text.trim().isNotEmpty)
+                    Text(
+                      text,
+                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                    ),
+                  if (imageUrl != null && imageUrl.trim().isNotEmpty) ...[
+                    if (text.trim().isNotEmpty) const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        _resolveMediaUrl(imageUrl),
+                        width: 170,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 170,
+                          height: 110,
+                          color: Colors.grey.shade200,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (voiceUrl != null && voiceUrl.trim().isNotEmpty) ...[
+                    if (text.trim().isNotEmpty || (imageUrl != null && imageUrl.trim().isNotEmpty)) const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => _toggleVoicePlayback(voiceUrl),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _playingVoiceUrl == _resolveMediaUrl(voiceUrl) && _isVoicePlaying
+                                  ? Icons.pause_circle_filled_rounded
+                                  : Icons.play_circle_fill_rounded,
+                              size: 20,
+                              color: Colors.black87,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Voice message',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (time.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        time,
+                        style: const TextStyle(fontSize: 9, color: Colors.black45),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (isMe)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.black12,
+                backgroundImage: _mainUserProfileUrl != null
+                    ? NetworkImage(_mainUserProfileUrl!)
+                    : null,
+                onBackgroundImageError: (_, __) {
+                  if (!mounted) {
+                    return;
+                  }
+                  setState(() {
+                    _mainUserProfileUrl = null;
+                  });
+                },
+                child: _mainUserProfileUrl == null
+                    ? const Icon(Icons.person, color: Colors.black54, size: 18)
+                    : null,
+              ),
+            )
+          else if (isFromAI)
+            const SizedBox(width: 2),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAttachItem(String imageAssetPath, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 99,
+        height: 24,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(width: 8),
+            Image.asset(
+              imageAssetPath,
+              width: 13,
+              height: 13,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+            ),
+          ],
+        ),
       ),
     );
   }

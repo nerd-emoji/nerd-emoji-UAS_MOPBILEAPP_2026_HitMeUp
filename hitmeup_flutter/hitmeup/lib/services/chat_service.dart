@@ -145,6 +145,273 @@ class ChatService {
     }
   }
 
+  /// Ensure a context-aware AI chat exists and return it.
+  static Future<Map<String, dynamic>> ensureAiChat({
+    required int mainUserId,
+    int? contextUserId,
+    int? contextCommunityId,
+  }) async {
+    try {
+      final queryParameters = <String, String>{'main_user': mainUserId.toString()};
+      if (contextUserId != null) {
+        queryParameters['context_user'] = contextUserId.toString();
+      }
+      if (contextCommunityId != null) {
+        queryParameters['context_community'] = contextCommunityId.toString();
+      }
+
+      final listResponse = await http.get(
+        Uri.parse('$baseUrl/api/ai-chats/').replace(queryParameters: queryParameters),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (listResponse.statusCode == 200) {
+        final decoded = jsonDecode(listResponse.body);
+        final chats = List<Map<String, dynamic>>.from(decoded as List<dynamic>);
+        if (chats.isNotEmpty) {
+          Map<String, dynamic>? matchedChat;
+
+          if (contextUserId != null) {
+            for (final chat in chats) {
+              if (chat['context_user'] == contextUserId && chat['context_community'] == null) {
+                matchedChat = chat;
+                break;
+              }
+            }
+          } else if (contextCommunityId != null) {
+            for (final chat in chats) {
+              if (chat['context_community'] == contextCommunityId && chat['context_user'] == null) {
+                matchedChat = chat;
+                break;
+              }
+            }
+          } else {
+            // Solo chat must have no context user/community.
+            for (final chat in chats) {
+              if (chat['context_user'] == null && chat['context_community'] == null) {
+                matchedChat = chat;
+                break;
+              }
+            }
+          }
+
+          if (matchedChat != null) {
+            return matchedChat;
+          }
+        }
+      }
+
+      final body = <String, dynamic>{'main_user': mainUserId};
+      if (contextUserId != null) {
+        body['context_user'] = contextUserId;
+      }
+      if (contextCommunityId != null) {
+        body['context_community'] = contextCommunityId;
+      }
+
+      final createResponse = await http.post(
+        Uri.parse('$baseUrl/api/ai-chats/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      if (createResponse.statusCode == 201 || createResponse.statusCode == 200) {
+        return jsonDecode(createResponse.body) as Map<String, dynamic>;
+      }
+
+      throw Exception('Failed to create AI chat: ${createResponse.statusCode} ${createResponse.body}');
+    } catch (e) {
+      throw Exception('Error ensuring AI chat: $e');
+    }
+  }
+
+  /// Fetch messages for an AI chat.
+  static Future<List<Map<String, dynamic>>> fetchAiMessages(
+    int chatId, {
+    int? limit,
+    int? beforeId,
+  }) async {
+    try {
+      final queryParameters = <String, String>{'chat': chatId.toString()};
+      if (limit != null) {
+        queryParameters['limit'] = limit.toString();
+      }
+      if (beforeId != null) {
+        queryParameters['before_id'] = beforeId.toString();
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/ai-chat-messages/').replace(queryParameters: queryParameters),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(decoded as List<dynamic>);
+      }
+
+      throw Exception('Failed to load AI messages: ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Error fetching AI messages: $e');
+    }
+  }
+
+  /// Send a user AI message.
+  static Future<Map<String, dynamic>> sendAiMessage({
+    required int chatId,
+    required int senderId,
+    required String text,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai-chat-messages/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'chat': chatId,
+          'sender': senderId,
+          'isFromAI': false,
+          'text': text,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      throw Exception('Failed to send AI message: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      throw Exception('Error sending AI message: $e');
+    }
+  }
+
+  /// Send an AI-generated message.
+  static Future<Map<String, dynamic>> sendAiAssistantMessage({
+    required int chatId,
+    required String text,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai-chat-messages/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'chat': chatId,
+          'isFromAI': true,
+          'text': text,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      throw Exception('Failed to send AI assistant message: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      throw Exception('Error sending AI assistant message: $e');
+    }
+  }
+
+  /// Ask backend Gemini endpoint to generate and store an AI reply.
+  static Future<Map<String, dynamic>> generateAiReply({
+    required int chatId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/ai-chat-messages/generate/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'chat': chatId,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      throw Exception('Failed to generate AI reply: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      throw Exception('Error generating AI reply: $e');
+    }
+  }
+
+  /// Send a user AI image message.
+  static Future<Map<String, dynamic>> sendAiImageMessage({
+    required int chatId,
+    required int senderId,
+    required Uint8List imageBytes,
+    required String fileName,
+    String? text,
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/ai-chat-messages/'),
+      )
+        ..fields['chat'] = chatId.toString()
+        ..fields['sender'] = senderId.toString()
+        ..fields['isFromAI'] = 'false';
+
+      if (text != null && text.trim().isNotEmpty) {
+        request.fields['text'] = text.trim();
+      }
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: fileName,
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      throw Exception('Failed to send AI image message: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      throw Exception('Error sending AI image message: $e');
+    }
+  }
+
+  /// Send a user AI voice message.
+  static Future<Map<String, dynamic>> sendAiVoiceMessage({
+    required int chatId,
+    required int senderId,
+    required Uint8List audioBytes,
+    required String fileName,
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/ai-chat-messages/'),
+      )
+        ..fields['chat'] = chatId.toString()
+        ..fields['sender'] = senderId.toString()
+        ..fields['isFromAI'] = 'false';
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'voiceRecording',
+          audioBytes,
+          filename: fileName,
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 201) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+
+      throw Exception('Failed to send AI voice message: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      throw Exception('Error sending AI voice message: $e');
+    }
+  }
+
   /// Fetch a single community message by id
   static Future<Map<String, dynamic>> fetchCommunityMessageById(int messageId) async {
     try {

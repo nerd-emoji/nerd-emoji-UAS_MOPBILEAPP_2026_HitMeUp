@@ -1171,11 +1171,29 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                   children: [
                     // Chat.AI banner
                     GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const AiChatScreen()),
-                      ),
+                      onTap: () {
+                        final currentUserId = AuthSession.instance.userId;
+                        if (currentUserId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Not logged in')),
+                          );
+                          return;
+                        }
+
+                        final contextUserId = widget.chat.user1 == currentUserId
+                            ? widget.chat.user2
+                            : widget.chat.user1;
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AiChatScreen(
+                              contextUserId: contextUserId,
+                              contextTitle: widget.chat.name,
+                            ),
+                          ),
+                        );
+                      },
                       child: Container(
                         width: double.infinity,
                         height: 64,

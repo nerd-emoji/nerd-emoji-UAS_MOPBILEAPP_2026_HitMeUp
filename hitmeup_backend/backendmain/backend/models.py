@@ -107,6 +107,120 @@ class directchat(models.Model):
 		return f"{self.user1} - {self.user2}"
 
 
+class aichat(models.Model):
+	id = models.AutoField(primary_key=True)
+	main_user = models.ForeignKey(user, on_delete=models.CASCADE, related_name="ai_chats")
+	context_user = models.ForeignKey(user, on_delete=models.CASCADE, blank=True, null=True, related_name="ai_chats_with_user_context")
+	context_community = models.ForeignKey(
+		community,
+		on_delete=models.CASCADE,
+		blank=True,
+		null=True,
+		related_name="ai_chats_with_community_context",
+	)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		constraints = [
+			models.CheckConstraint(
+				condition=~(
+					models.Q(context_user__isnull=False) & models.Q(context_community__isnull=False)
+				),
+				name="aichat_single_context_only",
+			),
+			models.CheckConstraint(
+				condition=models.Q(context_user__isnull=True) | ~models.Q(main_user=models.F("context_user")),
+				name="aichat_distinct_main_and_context_user",
+			),
+			models.UniqueConstraint(
+				fields=["main_user", "context_user"],
+				condition=models.Q(context_user__isnull=False),
+				name="unique_aichat_main_user_context_user",
+			),
+			models.UniqueConstraint(
+				fields=["main_user", "context_community"],
+				condition=models.Q(context_community__isnull=False),
+				name="unique_aichat_main_user_context_community",
+			),
+			models.UniqueConstraint(
+				fields=["main_user"],
+				condition=models.Q(context_user__isnull=True, context_community__isnull=True),
+				name="unique_aichat_main_user_solo",
+			),
+		]
+
+	def clean(self):
+		if self.context_user_id and self.context_community_id:
+			raise ValidationError("AI chat can have either a user context or a community context, not both.")
+
+		if self.main_user_id and self.context_user_id and self.main_user_id == self.context_user_id:
+			raise ValidationError("Main user and context user must be different users.")
+
+		if self.main_user_id and self.context_user_id:
+			are_friends = user.objects.filter(id=self.main_user_id, friends__id=self.context_user_id).exists()
+			if not are_friends:
+				raise ValidationError("User-context AI chat is allowed only between friends.")
+
+		if self.main_user_id and self.context_community_id:
+			is_member = self.context_community.members.filter(id=self.main_user_id).exists()
+			if not is_member:
+				raise ValidationError("Main user must be a member of the community context.")
+
+	def save(self, *args, **kwargs):
+		self.full_clean()
+		return super().save(*args, **kwargs)
+
+	def __str__(self):
+		if self.context_user_id:
+			return f"AI chat: {self.main_user_id} with user context {self.context_user_id}"
+		if self.context_community_id:
+			return f"AI chat: {self.main_user_id} in community context {self.context_community_id}"
+		return f"AI chat: {self.main_user_id} solo"
+
+
+class aichatmessage(models.Model):
+	id = models.AutoField(primary_key=True)
+	chat = models.ForeignKey(aichat, on_delete=models.CASCADE, related_name="messages")
+	sender = models.ForeignKey(user, on_delete=models.CASCADE, blank=True, null=True, related_name="sent_ai_messages")
+	isFromAI = models.BooleanField(default=False)
+	text = models.TextField(blank=True)
+	image = models.ImageField(upload_to="ai_chat/images/", blank=True, null=True)
+	video = models.FileField(upload_to="ai_chat/videos/", blank=True, null=True)
+	voiceRecording = models.FileField(upload_to="ai_chat/voice/", blank=True, null=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ["created_at"]
+
+	def clean(self):
+		if self.chat_id:
+			if self.sender_id and self.sender_id != self.chat.main_user_id:
+				raise ValidationError("Sender must be the main user for user-originated AI chat messages.")
+
+		if self.sender_id and self.isFromAI:
+			raise ValidationError("AI messages must not include a user sender.")
+
+		if not self.sender_id and not self.isFromAI:
+			raise ValidationError("Message must be sent by the main user or marked as AI-generated.")
+
+		has_content = (
+			bool(self.text and self.text.strip())
+			or bool(self.image)
+			or bool(self.video)
+			or bool(self.voiceRecording)
+		)
+		if not has_content:
+			raise ValidationError("Message must include text, image, video, or voiceRecording.")
+
+	def save(self, *args, **kwargs):
+		self.full_clean()
+		return super().save(*args, **kwargs)
+
+	def __str__(self):
+		return f"AI message {self.id} in chat {self.chat_id}"
+
+
 class directmessage(models.Model):
 	id = models.AutoField(primary_key=True)
 	chat = models.ForeignKey(directchat, on_delete=models.CASCADE, related_name="messages")

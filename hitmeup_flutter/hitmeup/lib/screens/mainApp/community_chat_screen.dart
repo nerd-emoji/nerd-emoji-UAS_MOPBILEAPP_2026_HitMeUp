@@ -1229,10 +1229,25 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AiChatScreen()),
-                      ),
+                      onTap: () {
+                        final communityId = _communityId;
+                        if (communityId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invalid community context for AI chat')),
+                          );
+                          return;
+                        }
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AiChatScreen(
+                              contextCommunityId: communityId,
+                              contextTitle: _community.name,
+                            ),
+                          ),
+                        );
+                      },
                       child: Container(
                         width: double.infinity,
                         height: 64,

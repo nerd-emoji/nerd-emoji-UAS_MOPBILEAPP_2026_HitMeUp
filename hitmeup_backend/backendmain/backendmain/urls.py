@@ -20,6 +20,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from backend.views import (
+    aiChatMessageViewSet,
+    aiChatViewSet,
     communityViewSet,
     communityMessagePollOptionViewSet,
     communityMessagePollViewSet,
@@ -46,6 +48,8 @@ router.register(r'community-message-poll-options', communityMessagePollOptionVie
 router.register(r'community-message-poll-votes', communityMessagePollVoteViewSet, basename='community-message-poll-votes')
 router.register(r'direct-chats', directChatViewSet, basename='direct-chats')
 router.register(r'direct-messages', directMessageViewSet, basename='direct-messages')
+router.register(r'ai-chats', aiChatViewSet, basename='ai-chats')
+router.register(r'ai-chat-messages', aiChatMessageViewSet, basename='ai-chat-messages')
 router.register(r'direct-message-polls', directMessagePollViewSet, basename='direct-message-polls')
 router.register(r'direct-message-poll-options', directMessagePollOptionViewSet, basename='direct-message-poll-options')
 router.register(r'direct-message-poll-votes', directMessagePollVoteViewSet, basename='direct-message-poll-votes')

@@ -891,11 +891,11 @@ class _CommunityLoadingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return const SizedBox(
       width: 102,
-      child: Column(
+      child:  Column(
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           SizedBox(
             width: 88,
             height: 88,
@@ -1026,8 +1026,8 @@ class _RecentChatLoadingTile extends StatelessWidget {
         color: const Color(0xFFF3F3F3),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Row(
-        children: const [
+      child: const Row(
+        children: [
           SizedBox(
             width: 40,
             height: 40,

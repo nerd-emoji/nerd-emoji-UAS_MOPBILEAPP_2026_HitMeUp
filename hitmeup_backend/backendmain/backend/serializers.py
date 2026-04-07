@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import (
+	aichat,
+	aichatmessage,
 	community,
 	communitymessage,
 	communitymessagepoll,
@@ -117,6 +119,125 @@ class directChatSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = directchat
 		fields = ["id", "user1", "user2", "created_at", "updated_at", "lastMessage"]
+
+
+class aiChatSerializer(serializers.ModelSerializer):
+	lastMessage = serializers.SerializerMethodField(read_only=True)
+
+	def get_lastMessage(self, obj):
+		latest_message = obj.messages.order_by("-created_at").first()
+		if latest_message is None:
+			return ""
+		if latest_message.text:
+			return latest_message.text
+		if latest_message.image:
+			return "Image"
+		if latest_message.video:
+			return "Video"
+		if latest_message.voiceRecording:
+			return "Voice message"
+		return ""
+
+	def validate(self, attrs):
+		main_user_obj = attrs.get("main_user", self.instance.main_user if self.instance else None)
+		context_user_obj = attrs.get("context_user", self.instance.context_user if self.instance else None)
+		context_community_obj = attrs.get("context_community", self.instance.context_community if self.instance else None)
+
+		if context_user_obj and context_community_obj:
+			raise serializers.ValidationError("AI chat can have either a user context or a community context, not both.")
+
+		if main_user_obj and context_user_obj and main_user_obj.id == context_user_obj.id:
+			raise serializers.ValidationError("Main user and context user must be different users.")
+
+		if main_user_obj and context_user_obj:
+			are_friends = user.objects.filter(id=main_user_obj.id, friends__id=context_user_obj.id).exists()
+			if not are_friends:
+				raise serializers.ValidationError("User-context AI chat is allowed only between friends.")
+
+		if main_user_obj and context_community_obj:
+			if not context_community_obj.members.filter(id=main_user_obj.id).exists():
+				raise serializers.ValidationError("Main user must be a member of the community context.")
+
+		return attrs
+
+	def create(self, validated_data):
+		main_user_obj = validated_data["main_user"]
+		context_user_obj = validated_data.get("context_user")
+		context_community_obj = validated_data.get("context_community")
+
+		if context_user_obj is not None:
+			chat, _ = aichat.objects.get_or_create(main_user=main_user_obj, context_user=context_user_obj)
+			return chat
+
+		if context_community_obj is not None:
+			chat, _ = aichat.objects.get_or_create(main_user=main_user_obj, context_community=context_community_obj)
+			return chat
+
+		chat, _ = aichat.objects.get_or_create(
+			main_user=main_user_obj,
+			context_user=None,
+			context_community=None,
+		)
+		return chat
+
+	class Meta:
+		model = aichat
+		fields = [
+			"id",
+			"main_user",
+			"context_user",
+			"context_community",
+			"created_at",
+			"updated_at",
+			"lastMessage",
+		]
+
+
+class aiChatMessageSerializer(serializers.ModelSerializer):
+	senderName = serializers.CharField(source="sender.name", read_only=True)
+	senderProfile = serializers.ImageField(source="sender.profilepicture", read_only=True)
+
+	def validate(self, attrs):
+		chat_obj = attrs.get("chat", self.instance.chat if self.instance else None)
+		sender_obj = attrs.get("sender", self.instance.sender if self.instance else None)
+		is_from_ai = attrs.get("isFromAI", self.instance.isFromAI if self.instance else False)
+
+		if chat_obj and sender_obj and sender_obj.id != chat_obj.main_user_id:
+			raise serializers.ValidationError("Sender must be the main user for user-originated AI chat messages.")
+
+		if sender_obj and is_from_ai:
+			raise serializers.ValidationError("AI messages must not include a user sender.")
+
+		if not sender_obj and not is_from_ai:
+			raise serializers.ValidationError("Message must be sent by the main user or marked as AI-generated.")
+
+		text_value = attrs.get("text", self.instance.text if self.instance else "")
+		image_value = attrs.get("image", self.instance.image if self.instance else None)
+		video_value = attrs.get("video", self.instance.video if self.instance else None)
+		voice_value = attrs.get("voiceRecording", self.instance.voiceRecording if self.instance else None)
+
+		has_content = bool(text_value and str(text_value).strip()) or bool(image_value) or bool(video_value) or bool(voice_value)
+		if not has_content:
+			raise serializers.ValidationError("Message must include text, image, video, or voiceRecording.")
+
+		return attrs
+
+	class Meta:
+		model = aichatmessage
+		fields = [
+			"id",
+			"chat",
+			"sender",
+			"senderName",
+			"senderProfile",
+			"isFromAI",
+			"text",
+			"image",
+			"video",
+			"voiceRecording",
+			"created_at",
+		]
+		read_only_fields = ["created_at"]
 
 
 class directMessageSerializer(serializers.ModelSerializer):
