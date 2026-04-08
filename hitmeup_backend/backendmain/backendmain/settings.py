@@ -30,7 +30,12 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
     '10.0.2.2',
+    '10.10.179.22'
 ]
+
+if DEBUG:
+    # Local development convenience: allow requests from LAN devices.
+    ALLOWED_HOSTS.append('*')
 
 
 # Application definition
@@ -135,3 +140,7 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@hitmeup.local')
+
+# Gemini AI configuration
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash').strip()

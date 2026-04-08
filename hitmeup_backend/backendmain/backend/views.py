@@ -55,8 +55,8 @@ from .serializers import (
 # Create your views here.
 
 
-GEMINI_API_KEY = "AIzaSyDJwEcS7UP0FusxUJWnfHQDEJoq7EYwktg"
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_API_KEY = getattr(settings, "GEMINI_API_KEY", "")
+GEMINI_MODEL = getattr(settings, "GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_GENERATE_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 AI_CHAT_HISTORY_LIMIT = 24
 COMMUNITY_CHAT_HISTORY_LIMIT = 30
@@ -449,6 +449,9 @@ def _extract_gemini_text(response_payload):
 
 
 def _generate_gemini_reply(chat_obj):
+	if not GEMINI_API_KEY:
+		raise RuntimeError("Gemini API key is not configured on the backend. Set GEMINI_API_KEY environment variable.")
+
 	payload = {
 		"contents": _build_gemini_contents(chat_obj),
 		"generationConfig": {
@@ -486,6 +489,22 @@ def _generate_gemini_reply(chat_obj):
 class userViewSet(viewsets.ModelViewSet):
 	queryset = user.objects.all()
 	serializer_class = userSerializer
+
+	@action(detail=False, methods=["post"], url_path="check-email")
+	def check_email(self, request):
+		email = str(request.data.get("email", "")).strip().lower()
+
+		if not email:
+			return Response(
+				{"detail": "email is required."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		exists = user.objects.filter(email__iexact=email).exists()
+		return Response(
+			{"exists": exists},
+			status=status.HTTP_200_OK,
+		)
 
 	@action(detail=False, methods=["post"], url_path="login")
 	def login(self, request):

@@ -1101,9 +1101,11 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
 
   String _formatTime(String dateTimeString) {
     try {
-      final dateTime = DateTime.parse(dateTimeString);
-      final hour = dateTime.hour.toString().padLeft(2, '0');
-      final minute = dateTime.minute.toString().padLeft(2, '0');
+      final wibTime = DateTime.parse(dateTimeString)
+          .toUtc()
+          .add(const Duration(hours: 7));
+      final hour = wibTime.hour.toString().padLeft(2, '0');
+      final minute = wibTime.minute.toString().padLeft(2, '0');
       return '$hour:$minute';
     } catch (e) {
       return '';
@@ -1839,7 +1841,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
             child: Container(
               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
               decoration: BoxDecoration(
-                color: const Color(0xFF73A4F5),
+                color: isMe ? const Color(0xFF73A4F5) : Colors.white,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),

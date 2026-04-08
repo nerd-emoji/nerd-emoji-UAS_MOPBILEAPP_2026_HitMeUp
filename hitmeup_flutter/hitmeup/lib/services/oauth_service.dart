@@ -23,6 +23,9 @@ class OAuthService {
   /// Sign in with Google
   Future<Map<String, dynamic>?> signInWithGoogle() async {
     try {
+      // Ensure account picker is shown instead of silently reusing a cached account.
+      await _googleSignIn.signOut();
+
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         return null; // User cancelled

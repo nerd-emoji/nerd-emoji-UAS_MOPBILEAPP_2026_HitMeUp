@@ -955,9 +955,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   String _formatTime(String dateTimeString) {
     try {
-      final dateTime = DateTime.parse(dateTimeString);
-      final hour = dateTime.hour.toString().padLeft(2, '0');
-      final minute = dateTime.minute.toString().padLeft(2, '0');
+      final wibTime = DateTime.parse(dateTimeString)
+          .toUtc()
+          .add(const Duration(hours: 7));
+      final hour = wibTime.hour.toString().padLeft(2, '0');
+      final minute = wibTime.minute.toString().padLeft(2, '0');
       return '$hour:$minute';
     } catch (_) {
       return '';
@@ -1377,14 +1379,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 backgroundImage: _mainUserProfileUrl != null
                     ? NetworkImage(_mainUserProfileUrl!)
                     : null,
-                onBackgroundImageError: (_, __) {
-                  if (!mounted) {
-                    return;
-                  }
-                  setState(() {
-                    _mainUserProfileUrl = null;
-                  });
-                },
+                onBackgroundImageError: _mainUserProfileUrl != null
+                    ? (_, __) {
+                        if (!mounted) {
+                          return;
+                        }
+                        setState(() {
+                          _mainUserProfileUrl = null;
+                        });
+                      }
+                    : null,
                 child: _mainUserProfileUrl == null
                     ? const Icon(Icons.person, color: Colors.black54, size: 18)
                     : null,

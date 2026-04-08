@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/chat_service.dart';
 import '../../services/auth_session.dart';
+import '../../services/api_config.dart';
 import 'chat.dart';
 import 'chat_models.dart';
 import 'community_chat_screen.dart';
@@ -70,11 +71,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 	}
 
 	String _extractBaseUrl() {
-		const overrideUrl = String.fromEnvironment('SIGNUP_API_BASE_URL');
-		if (overrideUrl.isNotEmpty) {
-			return overrideUrl;
-		}
-		return 'http://10.0.2.2:8000';
+		return ApiConfig.baseUrl;
 	}
 
 	String _resolveCommunityImageUrl(dynamic rawPath) {
