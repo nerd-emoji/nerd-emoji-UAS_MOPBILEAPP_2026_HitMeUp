@@ -368,6 +368,21 @@ class _RequestsScreenState extends State<RequestsScreen> {
     }
   }
 
+  Future<void> _updateUserDiamonds(int userId, int newDiamondCount) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/users/$userId/');
+    try {
+      await http
+          .patch(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'diamonds': newDiamondCount}),
+          )
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Silently ignore sync errors
+    }
+  }
+
   void _showRequestResultDialog(_FriendRequestCardData data, bool accepted) {
     showDialog(
       context: context,

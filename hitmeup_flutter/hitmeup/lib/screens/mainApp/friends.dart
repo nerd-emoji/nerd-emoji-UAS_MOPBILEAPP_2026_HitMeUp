@@ -285,7 +285,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             'You do not have any friends yet.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white,
+              color: Color.fromARGB(255, 0, 0, 0),
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -338,8 +338,8 @@ class _FriendTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 367,
-      height: 109,
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 109),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -422,8 +422,6 @@ class _FriendTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     data.interests,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w600,

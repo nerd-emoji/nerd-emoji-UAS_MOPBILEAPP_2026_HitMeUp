@@ -201,6 +201,126 @@ def _contains_any_keyword(text_value, keywords):
 	return any(keyword in text_value for keyword in keywords)
 
 
+def _extract_recommendation_user_id(reply_text):
+	match = re.search(r"\[FRIEND_REC\]\s*(\d+)\s*\[/FRIEND_REC\]", reply_text or "", re.IGNORECASE)
+	if match is None:
+		return None
+	try:
+		return int(match.group(1))
+	except (TypeError, ValueError):
+		return None
+
+
+def _strip_friend_recommendation_markers(reply_text):
+	cleaned_text = re.sub(r"\[FRIEND_REC[^\n]*", "", reply_text or "", flags=re.IGNORECASE)
+	cleaned_text = re.sub(r"\n{3,}", "\n\n", cleaned_text)
+	return cleaned_text.strip()
+
+
+def _sanitize_friend_recommendation_reply(reply_text):
+	cleaned_text = reply_text or ""
+	cleaned_text = re.sub(r"\*([^*\n]+)\*", r"\1", cleaned_text)
+	cleaned_text = re.sub(r"\bID\s*[:#]?\s*\d+\b", "", cleaned_text, flags=re.IGNORECASE)
+	cleaned_text = re.sub(r"\(\s*\d+\s*\)", "", cleaned_text)
+	cleaned_text = re.sub(r"\s{2,}", " ", cleaned_text)
+	cleaned_text = re.sub(r"\s+([,.;:!?])", r"\1", cleaned_text)
+	cleaned_text = re.sub(r"\n{3,}", "\n\n", cleaned_text)
+	return cleaned_text.strip()
+
+
+def _score_friend_recommendation_candidate(main_user_obj, candidate_obj, prompt_text):
+	score = 0
+	main_interests = [
+		interest.lower()
+		for interest in [main_user_obj.intrest1, main_user_obj.intrest2, main_user_obj.intrest3, main_user_obj.intrest4]
+		if interest
+	]
+	candidate_interests = [
+		interest.lower()
+		for interest in [candidate_obj.intrest1, candidate_obj.intrest2, candidate_obj.intrest3, candidate_obj.intrest4]
+		if interest
+	]
+	prompt_value = prompt_text.lower()
+
+	for interest in candidate_interests:
+		if interest in prompt_value:
+			score += 25
+		if interest in main_interests:
+			score += 20
+
+	if candidate_obj.location and candidate_obj.location.lower() in prompt_value:
+		score += 20
+	if candidate_obj.location and main_user_obj.location and candidate_obj.location.lower() == main_user_obj.location.lower():
+		score += 10
+
+	level_gap = abs((candidate_obj.level or 1) - (main_user_obj.level or 1))
+	score += max(0, 12 - level_gap)
+
+	if candidate_obj.diamonds:
+		score += min(candidate_obj.diamonds // 10, 10)
+
+	return score
+
+
+def _select_friend_recommendation_candidate(chat_obj):
+	main_user_obj = chat_obj.main_user
+	latest_prompt = _latest_user_prompt_text(chat_obj)
+
+	candidates = (
+		user.objects.exclude(id=main_user_obj.id)
+		.exclude(friends__id=main_user_obj.id)
+		.order_by("id")
+	)
+
+	if chat_obj.context_user_id:
+		candidates = candidates.exclude(id=chat_obj.context_user_id)
+
+	best_candidate = None
+	best_score = None
+	for candidate_obj in candidates:
+		score = _score_friend_recommendation_candidate(main_user_obj, candidate_obj, latest_prompt)
+		if best_candidate is None or score > best_score:
+			best_candidate = candidate_obj
+			best_score = score
+
+	return best_candidate
+
+
+def _normalize_friend_recommendation_reply(chat_obj, reply_text):
+	if not _detect_friend_recommendation_intent(_latest_user_prompt_text(chat_obj)):
+		return reply_text
+
+	existing_user_id = _extract_recommendation_user_id(reply_text)
+	if existing_user_id is None:
+		selected_candidate = _select_friend_recommendation_candidate(chat_obj)
+		existing_user_id = selected_candidate.id if selected_candidate is not None else None
+
+	cleaned_reply = _strip_friend_recommendation_markers(reply_text)
+	if existing_user_id is None:
+		return cleaned_reply
+
+	cleaned_reply = _sanitize_friend_recommendation_reply(cleaned_reply)
+
+	if cleaned_reply:
+		return f"{cleaned_reply}\n\n[FRIEND_REC]{existing_user_id}[/FRIEND_REC]"
+	return f"[FRIEND_REC]{existing_user_id}[/FRIEND_REC]"
+
+
+def _detect_friend_recommendation_intent(text_value):
+	friend_recommendation_keywords = [
+		"recommend",
+		"recommendation",
+		"friend recommendation",
+		"recommend a friend",
+		"suggest a friend",
+		"find friend",
+		"cocok",
+		"match",
+		"kenalin",
+	]
+	return _contains_any_keyword(text_value, friend_recommendation_keywords)
+
+
 def _build_context_loading_plan(chat_obj):
 	chat_mode = (
 		"solo"
@@ -216,6 +336,8 @@ def _build_context_loading_plan(chat_obj):
 		"user",
 		"friend",
 		"friends",
+		"recommend",
+		"recommendation",
 		"profile",
 		"email",
 		"birthday",
@@ -374,6 +496,15 @@ def _build_gemini_contents(chat_obj):
 		f"{_summarize_ai_chat_context(chat_obj)}"
 	)
 
+	latest_prompt = _latest_user_prompt_text(chat_obj)
+	if _detect_friend_recommendation_intent(latest_prompt):
+		system_prompt += (
+			" When the user asks for friend recommendations, choose from APP_DATA_JSON all_users and include up to 1 recommendation."
+			" For each recommendation, include an inline marker in this exact format: [FRIEND_REC]<user_id>[/FRIEND_REC]."
+			" Also provide a compact profile summary in plain language using the user's normal name, age if available, location, level, and why compatible."
+			" Do not mask the name with asterisks, do not mention the user's ID in the visible text, and do not add markdown emphasis."
+		)
+
 	knowledge_prompt = (
 		"Use the following app data as the source of truth. "
 		"Heavy sections are loaded only when needed based on the latest user request. "
@@ -448,18 +579,14 @@ def _extract_gemini_text(response_payload):
 	return _strip_leading_ai_label(combined)
 
 
-def _generate_gemini_reply(chat_obj):
-	if not GEMINI_API_KEY:
-		raise RuntimeError("Gemini API key is not configured on the backend. Set GEMINI_API_KEY environment variable.")
+def _gemini_finish_reason(response_payload):
+	candidates = response_payload.get("candidates") or []
+	if not candidates:
+		return ""
+	return str(candidates[0].get("finishReason") or "").upper()
 
-	payload = {
-		"contents": _build_gemini_contents(chat_obj),
-		"generationConfig": {
-			"temperature": 0.7,
-			"maxOutputTokens": 512,
-		},
-	}
 
+def _request_gemini_reply(payload):
 	request_obj = urllib_request.Request(
 		f"{GEMINI_GENERATE_URL}?key={GEMINI_API_KEY}",
 		data=json.dumps(payload).encode("utf-8"),
@@ -467,10 +594,35 @@ def _generate_gemini_reply(chat_obj):
 		method="POST",
 	)
 
+	with urllib_request.urlopen(request_obj, timeout=60) as raw_response:
+		body = raw_response.read().decode("utf-8")
+		return json.loads(body)
+
+
+def _build_gemini_continuation_prompt(reply_text):
+	return (
+		"Continue the previous answer from the exact point it stopped. "
+		"Do not repeat earlier text. Return only the missing continuation.\n\n"
+		f"Previous answer so far:\n{reply_text}"
+	)
+
+
+def _generate_gemini_reply(chat_obj):
+	if not GEMINI_API_KEY:
+		raise RuntimeError("Gemini API key is not configured on the backend. Set GEMINI_API_KEY environment variable.")
+
+	base_contents = _build_gemini_contents(chat_obj)
+	payload = {
+		"contents": base_contents,
+		"generationConfig": {
+			"temperature": 0.7,
+			"maxOutputTokens": 1024,
+		},
+	}
+
+	parsed = None
 	try:
-		with urllib_request.urlopen(request_obj, timeout=60) as raw_response:
-			body = raw_response.read().decode("utf-8")
-			parsed = json.loads(body)
+		parsed = _request_gemini_reply(payload)
 	except urllib_error.HTTPError as exc:
 		error_body = exc.read().decode("utf-8", errors="replace")
 		raise RuntimeError(f"Gemini HTTP {exc.code}: {error_body}")
@@ -482,6 +634,31 @@ def _generate_gemini_reply(chat_obj):
 	reply_text = _extract_gemini_text(parsed)
 	if not reply_text:
 		raise RuntimeError("Gemini returned an empty response.")
+
+	if _gemini_finish_reason(parsed) == "MAX_TOKENS":
+		continuation_payload = {
+			"contents": [
+				*base_contents,
+				{
+					"role": "model",
+					"parts": [{"text": reply_text}],
+				},
+				{
+					"role": "user",
+					"parts": [{"text": _build_gemini_continuation_prompt(reply_text)}],
+				},
+			],
+			"generationConfig": payload["generationConfig"],
+		}
+		try:
+			continuation_parsed = _request_gemini_reply(continuation_payload)
+			continuation_text = _extract_gemini_text(continuation_parsed)
+			if continuation_text:
+				reply_text = f"{reply_text}\n{continuation_text}".strip()
+		except Exception:
+			pass
+
+	reply_text = _normalize_friend_recommendation_reply(chat_obj, reply_text)
 
 	return reply_text
 
@@ -956,6 +1133,58 @@ class friendRequestViewSet(viewsets.ModelViewSet):
 			queryset = queryset.filter(status=status_value)
 
 		return queryset.order_by("-created_at")
+
+	@action(detail=False, methods=["post"], url_path="send-friend-request")
+	def send_friend_request(self, request):
+		requester_id = request.data.get("requester_id")
+		receiver_id = request.data.get("receiver_id")
+
+		if not requester_id or not receiver_id:
+			return Response(
+				{"detail": "requester_id and receiver_id are required."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		if str(requester_id) == str(receiver_id):
+			return Response(
+				{"detail": "A user cannot send a friend request to themselves."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		try:
+			requester_obj = user.objects.get(id=requester_id)
+			receiver_obj = user.objects.get(id=receiver_id)
+		except user.DoesNotExist:
+			return Response(
+				{"detail": "Requester or receiver not found."},
+				status=status.HTTP_404_NOT_FOUND,
+			)
+
+		if requester_obj.friends.filter(id=receiver_obj.id).exists():
+			return Response(
+				{"detail": "Users are already friends."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		existing_request = friendrequest.objects.filter(
+			Q(requester=requester_obj, receiver=receiver_obj)
+			| Q(requester=receiver_obj, receiver=requester_obj)
+		).order_by("-created_at").first()
+
+		if existing_request and existing_request.status == friendrequest.STATUS_PENDING:
+			return Response(
+				{"detail": "A pending friend request already exists between these users."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		new_request = friendrequest.objects.create(
+			requester=requester_obj,
+			receiver=receiver_obj,
+			status=friendrequest.STATUS_PENDING,
+		)
+
+		serializer = self.get_serializer(new_request)
+		return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class directMessagePollViewSet(viewsets.ReadOnlyModelViewSet):

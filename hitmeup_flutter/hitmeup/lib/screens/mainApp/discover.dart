@@ -81,15 +81,28 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
           break;
         }
       }
+
+      final friendIds = _extractUserIds(currentUser?['friends']);
+      final pendingRequestCounterpartyIds = await _loadPendingRequestCounterpartyIds(currentUserId);
+      final excludedUserIds = <int>{...friendIds, ...pendingRequestCounterpartyIds};
+
       final currentDiamondsRaw = currentUser?['diamonds'];
       final currentDiamonds = currentDiamondsRaw is int
           ? currentDiamondsRaw
           : int.tryParse(currentDiamondsRaw?.toString() ?? '');
 
       final mappedProfiles = users
-          .where((u) => u['id'] != currentUserId)
+          .where((u) {
+            final idRaw = u['id'];
+            final userId = idRaw is int ? idRaw : int.tryParse(idRaw?.toString() ?? '') ?? -1;
+            if (userId <= 0 || userId == currentUserId) {
+              return false;
+            }
+            return !excludedUserIds.contains(userId);
+          })
           .map(_mapUserToProfileCard)
           .toList();
+      mappedProfiles.shuffle(math.Random());
 
       if (!mounted) {
         return;
@@ -121,6 +134,94 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
         _profilesError =  
             'Unable to connect, try again later.';
       });
+    }
+  }
+
+  List<int> _extractUserIds(dynamic rawUsers) {
+    if (rawUsers is! List) {
+      return const [];
+    }
+
+    final ids = <int>[];
+    for (final item in rawUsers) {
+      if (item is int) {
+        ids.add(item);
+        continue;
+      }
+      if (item is String) {
+        final parsed = int.tryParse(item);
+        if (parsed != null) {
+          ids.add(parsed);
+        }
+        continue;
+      }
+      if (item is Map<String, dynamic>) {
+        final rawId = item['id'];
+        final parsed = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+        if (parsed != null) {
+          ids.add(parsed);
+        }
+      }
+    }
+
+    return ids;
+  }
+
+  Future<Set<int>> _loadPendingRequestCounterpartyIds(int? currentUserId) async {
+    if (currentUserId == null) {
+      return <int>{};
+    }
+
+    final sentUri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/friend-requests/?requester=$currentUserId&status=pending',
+    );
+    final receivedUri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/friend-requests/?receiver=$currentUserId&status=pending',
+    );
+
+    try {
+      final responses = await Future.wait([
+        http.get(sentUri).timeout(const Duration(seconds: 12)),
+        http.get(receivedUri).timeout(const Duration(seconds: 12)),
+      ]);
+
+      final excludedIds = <int>{};
+      for (final response in responses) {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          continue;
+        }
+
+        final decoded = jsonDecode(response.body);
+        final items = decoded is List
+            ? decoded
+            : (decoded is Map<String, dynamic> && decoded['results'] is List)
+                ? decoded['results'] as List<dynamic>
+                : const <dynamic>[];
+
+        for (final item in items) {
+          if (item is! Map<String, dynamic>) {
+            continue;
+          }
+
+          final requesterId = item['requester'] is int
+              ? item['requester'] as int
+              : int.tryParse(item['requester']?.toString() ?? '');
+          final receiverId = item['receiver'] is int
+              ? item['receiver'] as int
+              : int.tryParse(item['receiver']?.toString() ?? '');
+
+          if (requesterId != null && requesterId != currentUserId) {
+            excludedIds.add(requesterId);
+          }
+          if (receiverId != null && receiverId != currentUserId) {
+            excludedIds.add(receiverId);
+          }
+        }
+      }
+
+      return excludedIds;
+    } catch (_) {
+      return <int>{};
     }
   }
 
@@ -470,8 +571,14 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
         if (!mounted) {
           return;
         }
+        // Update diamonds locally (deduct 2)
+        setState(() {
+          _diamondBalance = (_diamondBalance - 2).clamp(0, 999999);
+        });
+        // Sync diamonds with backend
+        await _updateUserDiamonds(requesterId, _diamondBalance);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Friend request sent to ${profile.name}.')),
+          SnackBar(content: Text('Friend request sent to ${profile.name}. -2 diamonds')),
         );
         return;
       }
@@ -485,6 +592,21 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
       }
     } catch (_) {
       // Keep swipe fluid even when request send fails.
+    }
+  }
+
+  Future<void> _updateUserDiamonds(int userId, int newDiamondCount) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/users/$userId/');
+    try {
+      await http
+          .patch(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'diamonds': newDiamondCount}),
+          )
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Silently ignore sync errors
     }
   }
 

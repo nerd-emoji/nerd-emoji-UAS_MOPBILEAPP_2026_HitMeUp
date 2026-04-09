@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -33,6 +34,7 @@ class AiChatScreen extends StatefulWidget {
 class _AiChatScreenState extends State<AiChatScreen> {
   static const int _messagePageSize = 20;
   static const double _topLoadThreshold = 120.0;
+  static const String _assistantTypingMarker = '__assistant_typing__';
   static const String _galleryPermissionMessage =
       'Please allow gallery access so you can choose an image to send.';
   static const String _microphonePermissionMessage =
@@ -61,6 +63,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
   int? _aiChatId;
   List<Map<String, dynamic>> _messages = [];
   String? _mainUserProfileUrl;
+  final Map<int, Map<String, dynamic>> _recommendedProfiles = {};
+  final Set<int> _submittingFriendRequests = <int>{};
 
   @override
   void initState() {
@@ -241,6 +245,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         _isLoading = false;
         _hasMoreOlderMessages = messages.length == _messagePageSize;
       });
+      unawaited(_syncRecommendationProfilesFromMessages());
       _scrollToBottomUntilStable();
     } catch (e) {
       if (mounted) {
@@ -352,7 +357,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
       setState(() {
         _messages.add(userMessage);
-        _isSending = false;
+        _insertAssistantTypingPlaceholder();
       });
       _scrollToBottomWithSettling();
 
@@ -363,6 +368,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error sending AI message: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
       }
     }
   }
@@ -383,11 +394,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
       }
 
       setState(() {
-        _messages.add(aiMessage);
+        _replaceAssistantTypingPlaceholder(aiMessage);
       });
+
+      final rawText = (aiMessage['text'] ?? '').toString();
+      final recommendedIds = _extractRecommendationIds(rawText);
+      if (recommendedIds.isNotEmpty) {
+        unawaited(_loadRecommendedProfiles(recommendedIds));
+      }
+
       _scrollToBottomWithSettling();
     } catch (e) {
       if (mounted) {
+        setState(_removeAssistantTypingPlaceholder);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to generate AI reply: $e')),
         );
@@ -446,6 +465,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (mounted) {
         setState(() {
           _messages.add(sentMessage);
+          _insertAssistantTypingPlaceholder();
         });
         _scrollToBottomWithSettling();
       }
@@ -467,6 +487,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (mounted) {
         setState(() {
           _isPickingImage = false;
+          _isSending = false;
         });
       }
     }
@@ -480,6 +501,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (_showAttachMenu) {
       setState(() {
         _showAttachMenu = false;
+      });
+    }
+
+    if (mounted) {
+      setState(() {
+        _isSending = true;
       });
     }
 
@@ -518,6 +545,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (mounted) {
         setState(() {
           _messages.add(sentMessage);
+          _insertAssistantTypingPlaceholder();
         });
         _scrollToBottomWithSettling();
       }
@@ -545,6 +573,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (mounted) {
         setState(() {
           _isPickingImage = false;
+          _isSending = false;
         });
       }
     }
@@ -711,6 +740,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
       });
     }
 
+    if (mounted) {
+      setState(() {
+        _isSending = true;
+      });
+    }
+
     try {
       final recordingPath =
           '${Directory.systemTemp.path}${Platform.pathSeparator}ai_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
@@ -780,6 +815,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
 
     setState(() {
+      _isSending = true;
+    });
+    setState(() {
       _isSendingVoice = true;
     });
 
@@ -807,6 +845,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           _isRecordingVoice = false;
           _isSendingVoice = false;
           _voiceRecordDuration = Duration.zero;
+          _insertAssistantTypingPlaceholder();
         });
         _scrollToBottomWithSettling();
       }
@@ -822,6 +861,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to send voice recording: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
       }
     }
   }
@@ -934,7 +979,180 @@ class _AiChatScreenState extends State<AiChatScreen> {
     });
   }
 
+  List<int> _extractRecommendationIds(String text) {
+    if (text.trim().isEmpty) {
+      return [];
+    }
+
+    final matches = RegExp(r'\[FRIEND_REC\]\s*(\d+)\s*\[/FRIEND_REC\]', caseSensitive: false).allMatches(text);
+    final ids = <int>[];
+    for (final match in matches) {
+      final parsed = int.tryParse(match.group(1) ?? '');
+      if (parsed != null) {
+        ids.add(parsed);
+      }
+    }
+
+    if (ids.isEmpty) {
+      final fallbackMatch = RegExp(r'\[FRIEND_REC\]\s*(\d+)', caseSensitive: false).firstMatch(text);
+      final fallbackId = int.tryParse(fallbackMatch?.group(1) ?? '');
+      if (fallbackId != null) {
+        ids.add(fallbackId);
+      }
+    }
+
+    return ids.toSet().toList();
+  }
+
+  void _insertAssistantTypingPlaceholder() {
+    if (_messages.any((message) => message['_localType'] == _assistantTypingMarker)) {
+      return;
+    }
+
+    _messages.add({
+      'id': 'assistant-typing-${DateTime.now().microsecondsSinceEpoch}',
+      'text': '',
+      'image': null,
+      'voiceRecording': null,
+      'isMe': false,
+      'isFromAI': true,
+      'recommendedUserIds': const <int>[],
+      'time': '',
+      '_localType': _assistantTypingMarker,
+    });
+  }
+
+  void _replaceAssistantTypingPlaceholder(Map<String, dynamic> aiMessage) {
+    final placeholderIndex = _messages.indexWhere((message) => message['_localType'] == _assistantTypingMarker);
+    if (placeholderIndex == -1) {
+      _messages.add(aiMessage);
+      return;
+    }
+
+    _messages[placeholderIndex] = aiMessage;
+  }
+
+  void _removeAssistantTypingPlaceholder() {
+    _messages.removeWhere((message) => message['_localType'] == _assistantTypingMarker);
+  }
+
+  String _stripRecommendationMarkers(String text) {
+    return text
+        .replaceAll(RegExp(r'\[FRIEND_REC\]\s*\d+\s*\[/FRIEND_REC\]', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+  }
+
+  Future<void> _loadRecommendedProfiles(List<int> userIds) async {
+    for (final userId in userIds) {
+      if (_recommendedProfiles.containsKey(userId)) {
+        continue;
+      }
+      try {
+        final userData = await ChatService.fetchUser(userId);
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _recommendedProfiles[userId] = userData;
+        });
+      } catch (_) {
+        // Ignore missing profile details silently.
+      }
+    }
+  }
+
+  Future<void> _syncRecommendationProfilesFromMessages() async {
+    final ids = <int>{};
+    for (final message in _messages) {
+      final text = (message['text'] ?? '').toString();
+      ids.addAll(_extractRecommendationIds(text));
+    }
+
+    if (ids.isNotEmpty) {
+      await _loadRecommendedProfiles(ids.toList());
+    }
+  }
+
+  Future<void> _sendFriendRequestToUser(int receiverId) async {
+    final requesterId = AuthSession.instance.userId;
+    if (requesterId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not logged in')),
+        );
+      }
+      return;
+    }
+
+    if (_submittingFriendRequests.contains(receiverId)) {
+      return;
+    }
+
+    setState(() {
+      _submittingFriendRequests.add(receiverId);
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('${ChatService.baseUrl}/api/friend-requests/send-friend-request/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'requester_id': requesterId,
+          'receiver_id': receiverId,
+        }),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Friend request sent')),
+        );
+      } else {
+        String detail = 'Failed to send friend request';
+        try {
+          final body = jsonDecode(response.body) as Map<String, dynamic>;
+          detail = (body['detail'] ?? detail).toString();
+        } catch (_) {
+          detail = 'Failed to send friend request (${response.statusCode})';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(detail)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send friend request: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _submittingFriendRequests.remove(receiverId);
+        });
+      }
+    }
+  }
+
   Map<String, dynamic> _toDisplayMessage(Map<String, dynamic> msg) {
+    if (msg['_localType'] == _assistantTypingMarker) {
+      return {
+        'id': msg['id'],
+        'text': '',
+        'image': null,
+        'voiceRecording': null,
+        'isMe': false,
+        'isFromAI': true,
+        'recommendedUserIds': const <int>[],
+        'time': '',
+        'isTyping': true,
+      };
+    }
+
     final currentUserId = AuthSession.instance.userId;
     final senderId = msg['sender'] is int
         ? msg['sender'] as int
@@ -942,13 +1160,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final isFromAI = msg['isFromAI'] == true;
     final isMe = !isFromAI && senderId != null && senderId == currentUserId;
 
+    final rawText = (msg['text'] ?? '').toString();
+    final recommendationIds = _extractRecommendationIds(rawText);
+
     return {
       'id': msg['id'],
-      'text': msg['text'] ?? '',
+      'text': _stripRecommendationMarkers(rawText),
       'image': msg['image'] as String?,
       'voiceRecording': msg['voiceRecording'] as String?,
       'isMe': isMe,
       'isFromAI': isFromAI,
+      'recommendedUserIds': recommendationIds,
       'time': _formatTime(msg['created_at'] ?? ''),
     };
   }
@@ -997,7 +1219,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
                           final rawMessage = _messages[index];
-                          return _buildMessage(_toDisplayMessage(rawMessage));
+                          return _buildMessageWithRecommendations(_toDisplayMessage(rawMessage));
                         },
                       ),
                     Positioned(
@@ -1259,6 +1481,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget _buildMessage(Map<String, dynamic> msg) {
     final isMe = msg['isMe'] as bool;
     final isFromAI = msg['isFromAI'] as bool? ?? false;
+    final isTyping = msg['isTyping'] as bool? ?? false;
     final text = msg['text'] as String? ?? '';
     final time = msg['time'] as String? ?? '';
     final imageUrl = msg['image'] as String?;
@@ -1303,6 +1526,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (isTyping) const _AiTypingIndicator(),
                   if (text.trim().isNotEmpty)
                     Text(
                       text,
@@ -1401,6 +1625,145 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  Widget _buildMessageWithRecommendations(Map<String, dynamic> msg) {
+    final messageWidget = _buildMessage(msg);
+    final isFromAI = msg['isFromAI'] == true;
+    final ids = (msg['recommendedUserIds'] as List<dynamic>? ?? const <dynamic>[])
+        .map((value) => value is int ? value : int.tryParse(value.toString()))
+        .whereType<int>()
+        .toList();
+
+    if (!isFromAI || ids.isEmpty) {
+      return messageWidget;
+    }
+
+    final cards = <Widget>[];
+    for (final userId in ids) {
+      final profile = _recommendedProfiles[userId];
+      if (profile != null) {
+        cards.add(Padding(
+          padding: const EdgeInsets.only(left: 36, top: 6, bottom: 8),
+          child: _buildRecommendedProfileCard(profile),
+        ));
+      }
+    }
+
+    if (cards.isEmpty) {
+      return messageWidget;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        messageWidget,
+        ...cards,
+      ],
+    );
+  }
+
+  Widget _buildRecommendedProfileCard(Map<String, dynamic> profile) {
+    final userId = profile['id'] is int ? profile['id'] as int : int.tryParse('${profile['id']}') ?? 0;
+    final name = (profile['name'] ?? '').toString();
+    final location = (profile['location'] ?? '').toString();
+    final level = profile['level'] is int ? profile['level'] as int : int.tryParse('${profile['level']}') ?? 1;
+    final profileUrl = _resolveProfileUrl(profile['profilepicture']);
+    final isSubmitting = _submittingFriendRequests.contains(userId);
+
+    return Container(
+      width: 230,
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECECEC),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: AspectRatio(
+              aspectRatio: 0.78,
+              child: profileUrl != null
+                  ? Image.network(
+                      profileUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey.shade300,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.person, size: 42, color: Colors.black45),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.grey.shade300,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.person, size: 42, color: Colors.black45),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                shadows: [Shadow(color: Colors.black54, blurRadius: 3)],
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Level $level${location.isNotEmpty ? ' • $location' : ''}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Colors.white,
+                shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 26,
+            child: ElevatedButton(
+              onPressed: userId <= 0 || isSubmitting ? null : () => _sendFriendRequestToUser(userId),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF00A0D8),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+              ),
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('TAMBAH'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAttachItem(String imageAssetPath, String label, {VoidCallback? onTap}) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1432,6 +1795,61 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AiTypingIndicator extends StatefulWidget {
+  const _AiTypingIndicator();
+
+  @override
+  State<_AiTypingIndicator> createState() => _AiTypingIndicatorState();
+}
+
+class _AiTypingIndicatorState extends State<_AiTypingIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  double _dotScale(int index) {
+    final phase = (_controller.value + (index * 0.2)) % 1.0;
+    final intensity = phase < 0.5 ? phase / 0.5 : (1 - phase) / 0.5;
+    return 0.78 + (0.35 * intensity.clamp(0.0, 1.0));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            return Padding(
+              padding: EdgeInsets.only(right: index == 2 ? 0 : 4),
+              child: Transform.scale(
+                scale: _dotScale(index),
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

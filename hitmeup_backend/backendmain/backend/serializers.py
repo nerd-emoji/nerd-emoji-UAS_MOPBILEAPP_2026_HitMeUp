@@ -491,6 +491,11 @@ class friendRequestSerializer(serializers.ModelSerializer):
 			# Keep level in sync even if signal handlers are bypassed or stale.
 			instance.requester.sync_level_from_friends()
 			instance.receiver.sync_level_from_friends()
+			# Award 5 diamonds to both users
+			instance.requester.diamonds = max(0, instance.requester.diamonds + 5)
+			instance.requester.save(update_fields=["diamonds"])
+			instance.receiver.diamonds = max(0, instance.receiver.diamonds + 5)
+			instance.receiver.save(update_fields=["diamonds"])
 
 		# Resolved friend requests are deleted to keep table size small.
 		if new_status in {friendrequest.STATUS_ACCEPTED, friendrequest.STATUS_REJECTED}:
@@ -513,6 +518,9 @@ class friendRequestSerializer(serializers.ModelSerializer):
 				requester=requester_obj,
 				receiver=receiver_obj,
 			).delete()
+			# Deduct 2 diamonds from requester
+			requester_obj.diamonds = max(0, requester_obj.diamonds - 2)
+			requester_obj.save(update_fields=["diamonds"])
 
 		return super().create(validated_data)
 
