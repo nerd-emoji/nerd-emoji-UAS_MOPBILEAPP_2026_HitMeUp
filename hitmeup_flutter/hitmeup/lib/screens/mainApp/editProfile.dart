@@ -21,6 +21,7 @@ class EditProfileScreen extends StatefulWidget {
     required this.initialBirthday,
     required this.initialGender,
     required this.initialLocation,
+    required this.initialWantToMeet,
     this.initialProfilePictureUrl,
     required this.initialInterests,
   });
@@ -29,6 +30,7 @@ class EditProfileScreen extends StatefulWidget {
   final String initialBirthday;
   final String initialGender;
   final String initialLocation;
+  final String initialWantToMeet;
   final String? initialProfilePictureUrl;
   final List<String> initialInterests;
 
@@ -45,6 +47,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late List<TextEditingController> _interestControllers;
   late DateTime _selectedBirthday;
   late String _selectedGender;
+  late String _selectedWantToMeet;
   String? _profilePictureUrl;
   Uint8List? _pickedProfileImageBytes;
   bool _isPickingImage = false;
@@ -87,6 +90,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _selectedGender = 'male';
     }
     _selectedBirthday = _parseBirthday(widget.initialBirthday);
+    _selectedWantToMeet = _normalizeWantToMeetForApi(widget.initialWantToMeet);
     _interestControllers = widget.initialInterests
         .map((interest) => TextEditingController(text: interest))
         .toList();
@@ -144,7 +148,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           padding: const EdgeInsets.all(5),
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Color(0xFFE0E0E0),
+                            color: Color(0xFF448AFF),
                           ),
                           child: ClipOval(
                             child: _buildProfileImage(),
@@ -297,6 +301,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+                        _buildWantToMeetField(),
                         const SizedBox(height: 24),
                         if (_saveError != null) ...[
                           Text(
@@ -777,6 +783,98 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  Widget _buildWantToMeetField() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(
+          width: 100,
+          child: Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text(
+              'Who do you want to meet?',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF202020),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Column(
+            children: [
+              _buildWantToMeetOption('man', 'Man'),
+              const SizedBox(height: 8),
+              _buildWantToMeetOption('woman', 'Woman'),
+              const SizedBox(height: 8),
+              _buildWantToMeetOption('everyone', 'Everyone'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWantToMeetOption(String value, String label) {
+    final isSelected = _selectedWantToMeet == value;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: _isSaving
+          ? null
+          : () {
+              setState(() {
+                _selectedWantToMeet = value;
+              });
+            },
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0xFF448AFF),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF448AFF) : Colors.black,
+                  width: 1.6,
+                ),
+                color: isSelected ? const Color(0xFF448AFF) : Colors.transparent,
+              ),
+              child: isSelected
+                  ? const Icon(
+                      Icons.check,
+                      size: 14,
+                      color: Colors.white,
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _openBirthdayPicker() {
     showCupertinoModalPopup<void>(
       context: context,
@@ -1007,6 +1105,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       'name': _nameController.text.trim(),
       'birthday': _formatBirthday(_selectedBirthday),
       'gender': _selectedGender,
+      'wanttomeet': _selectedWantToMeet,
       'location': _locationController.text.trim(),
       'intrest1': interestAt(0),
       'intrest2': interestAt(1),
@@ -1114,6 +1213,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return 'female';
       default:
         return value;
+    }
+  }
+
+  String _normalizeWantToMeetForApi(String value) {
+    final lower = value.toLowerCase().trim();
+    switch (lower) {
+      case 'man':
+      case 'male':
+        return 'man';
+      case 'woman':
+      case 'female':
+        return 'woman';
+      case 'everyone':
+      case 'anyone':
+      case 'others':
+      case 'other':
+        return 'everyone';
+      default:
+        return 'everyone';
     }
   }
 

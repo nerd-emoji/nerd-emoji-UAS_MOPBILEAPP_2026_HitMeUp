@@ -11,6 +11,7 @@ import 'discover.dart';
 import 'editProfile.dart';
 import 'friends.dart';
 import 'requests.dart';
+import 'settings.dart';
 import '../auth/sign_in_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -32,6 +33,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _birthday = '30 September 2006';
   String _gender = 'Man';
   String _location = 'Tangerang Selatan';
+  String _wantToMeet = 'Everyone';
+  bool _showBirthday = true;
   String? _profilePictureUrl;
   List<String> _interests = [
     'Watch horror films',
@@ -124,6 +127,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final birthdayRaw = (userData['birthday'] as String?)?.trim();
     final genderRaw = (userData['gender'] as String?)?.trim();
     final location = (userData['location'] as String?)?.trim();
+    final wantToMeetRaw = (userData['wanttomeet'] as String?)?.trim();
+    final showBirthdayRaw = userData['showbirthday'];
     final profilePictureRaw = (userData['profilepicture'] as String?)?.trim();
 
     final interests = [
@@ -136,6 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _name = (name != null && name.isNotEmpty) ? name : _name;
     _birthday = _formatBirthdayValue(birthdayRaw);
     _gender = _formatGenderValue(genderRaw);
+    _wantToMeet = _formatWantToMeetValue(wantToMeetRaw);
+    _showBirthday = _parseBoolValue(showBirthdayRaw, defaultValue: true);
     _location =
         (location != null && location.isNotEmpty) ? location : _location;
     _profilePictureUrl = _resolveProfilePictureUrl(profilePictureRaw);
@@ -190,6 +197,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       default:
         return value;
     }
+  }
+
+  String _formatWantToMeetValue(String? value) {
+    if (value == null || value.isEmpty) {
+      return _wantToMeet;
+    }
+
+    switch (value.toLowerCase()) {
+      case 'man':
+        return 'Man';
+      case 'woman':
+        return 'Woman';
+      case 'everyone':
+      case 'anyone':
+        return 'Everyone';
+      default:
+        return value;
+    }
+  }
+
+  bool _parseBoolValue(dynamic value, {required bool defaultValue}) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is String) {
+      final normalized = value.toLowerCase().trim();
+      if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+        return true;
+      }
+      if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+        return false;
+      }
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    return defaultValue;
   }
 
   String? _resolveProfilePictureUrl(String? rawUrl) {
@@ -328,7 +372,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const SizedBox(width: 48),
+                      SizedBox(
+                        width: 37,
+                        height: 37,
+                        child: GestureDetector(
+                          onTap: _handleSettingsTap,
+                          child: Image.asset(
+                            'assets/setting-icon.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) {
+                              return const Icon(
+                                Icons.settings_outlined,
+                                color: Colors.black,
+                                size: 30,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                       const Spacer(),
                       SizedBox(
                         width: 37,
@@ -350,7 +411,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.all(5),
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Color(0xFFE0E0E0),
+                      color: Color(0xFF448AFF),
                     ),
                     child: ClipOval(
                       child: _buildProfileImage(),
@@ -390,7 +451,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         _ProfileInfoRow(
                           label: 'Birthday date',
-                          value: _birthday,
+                          value: _showBirthday ? _birthday : 'Hidden',
                         ),
                         const SizedBox(height: 10),
                         _ProfileInfoRow(label: 'Gender', value: _gender),
@@ -398,12 +459,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _ProfileInfoRow(
                           label: 'Location',
                           value: _location,
+                          alignTop: true,
                         ),
                         const SizedBox(height: 10),
                         _ProfileInfoRow(
                           label: 'My interests',
                           value: _interests.join('\n'),
                           alignTop: true,
+                        ),
+                        const SizedBox(height: 10),
+                        _ProfileInfoRow(
+                          label: 'Who do you want to meet?',
+                          value: _wantToMeet,
                         ),
                       ],
                     ),
@@ -449,6 +516,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           initialBirthday: _birthday,
           initialGender: _gender,
           initialLocation: _location,
+          initialWantToMeet: _wantToMeet,
           initialProfilePictureUrl: _profilePictureUrl,
           initialInterests: _interests,
         ),
@@ -493,6 +561,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             FadeTransition(opacity: animation, child: child),
       ),
     );
+  }
+
+  Future<void> _handleSettingsTap() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadProfileFromApi();
   }
 
   Future<void> _handleSignOut() async {
@@ -613,7 +693,7 @@ class _ProfileInfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment:
-          alignTop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+          alignTop ? CrossAxisAlignment.start : CrossAxisAlignment.end,
       children: [
         SizedBox(
           width: 132,
@@ -621,8 +701,9 @@ class _ProfileInfoRow extends StatelessWidget {
             padding: EdgeInsets.only(top: alignTop ? 2 : 0),
             child: Text(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+              maxLines: 2,
+              overflow: TextOverflow.visible,
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -632,15 +713,17 @@ class _ProfileInfoRow extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                height: 1.25,
-                fontWeight: FontWeight.w500,
-                color: Colors.black.withValues(alpha: 0.52),
+          child: Padding(
+            padding: EdgeInsets.only(top: alignTop ? 2 : 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black.withValues(alpha: 0.52),
+                ),
               ),
             ),
           ),

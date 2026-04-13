@@ -12,6 +12,11 @@ class user(models.Model):
 		("male", "Male"),
 		("female", "Female"),
 	]
+	WANT_TO_MEET_CHOICES = [
+		("man", "Man"),
+		("woman", "Woman"),
+		("everyone", "Everyone"),
+	]
 
 	id = models.AutoField(primary_key=True)
 	name = models.CharField(max_length=255)
@@ -19,6 +24,8 @@ class user(models.Model):
 	password = models.CharField(max_length=255)
 	gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
 	birthday = models.DateField()
+	showbirthday = models.BooleanField(default=True)
+	wanttomeet = models.CharField(max_length=10, choices=WANT_TO_MEET_CHOICES, default="everyone")
 	location = models.CharField(max_length=255)
 	intrest1 = models.CharField(max_length=100, blank=True)
 	intrest2 = models.CharField(max_length=100, blank=True)
@@ -285,6 +292,11 @@ class friendrequest(models.Model):
 	def clean(self):
 		if self.requester_id and self.receiver_id and self.requester_id == self.receiver_id:
 			raise ValidationError("A user cannot send a friend request to themselves.")
+
+		if self.requester_id:
+			requester = user.objects.get(id=self.requester_id)
+			if requester.diamonds < 2:
+				raise ValidationError("You must have at least 2 diamonds to send a friend request.")
 
 		if self.requester_id and self.receiver_id:
 			already_friends = user.objects.filter(id=self.requester_id, friends__id=self.receiver_id).exists()

@@ -395,10 +395,13 @@ class _FriendTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     data.birthday,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF767676),
+                      fontStyle: data.birthday == 'Birthday hidden'
+                          ? FontStyle.italic
+                          : FontStyle.normal,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -451,7 +454,13 @@ class _FriendData {
 
   factory _FriendData.fromApi(Map<String, dynamic> userData) {
     final name = (userData['name'] as String?)?.trim();
-    final birthday = _formatBirthdayValue(userData['birthday'] as String?);
+    final showBirthday = _parseBoolValue(
+      userData['showbirthday'],
+      defaultValue: true,
+    );
+    final birthday = showBirthday
+        ? _formatBirthdayValue(userData['birthday'] as String?)
+        : 'Birthday hidden';
     final gender = _formatGenderValue(userData['gender'] as String?);
     final location = (userData['location'] as String?)?.trim();
     final interests = _formatInterests(userData);
@@ -477,6 +486,25 @@ class _FriendData {
   final String location;
   final String interests;
   final String avatarUrl;
+}
+
+bool _parseBoolValue(dynamic value, {required bool defaultValue}) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is String) {
+    final normalized = value.toLowerCase().trim();
+    if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+      return false;
+    }
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  return defaultValue;
 }
 
 String _formatBirthdayValue(String? value) {

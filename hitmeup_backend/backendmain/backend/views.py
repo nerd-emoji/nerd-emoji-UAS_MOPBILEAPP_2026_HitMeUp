@@ -1160,6 +1160,12 @@ class friendRequestViewSet(viewsets.ModelViewSet):
 				status=status.HTTP_404_NOT_FOUND,
 			)
 
+		if requester_obj.diamonds < 2:
+			return Response(
+				{"detail": "You must have at least 2 diamonds to send a friend request."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
 		if requester_obj.friends.filter(id=receiver_obj.id).exists():
 			return Response(
 				{"detail": "Users are already friends."},

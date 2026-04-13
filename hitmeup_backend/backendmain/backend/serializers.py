@@ -27,6 +27,8 @@ class userSerializer(serializers.ModelSerializer):
 			"password",
 			"gender",
 			"birthday",
+			"showbirthday",
+			"wanttomeet",
 			"location",
 			"intrest1",
 			"intrest2",

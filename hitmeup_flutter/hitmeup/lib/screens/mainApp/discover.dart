@@ -25,7 +25,7 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
   static const double _maxDragDistance = 220;
   static const double _maxLift = 42;
   static const double _maxRotation = 0.14;
-  int _diamondBalance = 17;
+  int _diamondBalance = 0;
 
   final List<ProfileCardData> _allProfiles = [];
   final List<ProfileCardData> _profiles = [];
@@ -83,13 +83,22 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
       }
 
       final friendIds = _extractUserIds(currentUser?['friends']);
-      final pendingRequestCounterpartyIds = await _loadPendingRequestCounterpartyIds(currentUserId);
-      final excludedUserIds = <int>{...friendIds, ...pendingRequestCounterpartyIds};
+      final sentRequestCounterpartyIds = await _loadSentRequestCounterpartyIds(currentUserId);
+      final pendingReceivedRequestCounterpartyIds =
+          await _loadPendingReceivedRequestCounterpartyIds(currentUserId);
+      final excludedUserIds = <int>{
+        ...friendIds,
+        ...sentRequestCounterpartyIds,
+        ...pendingReceivedRequestCounterpartyIds,
+      };
 
       final currentDiamondsRaw = currentUser?['diamonds'];
       final currentDiamonds = currentDiamondsRaw is int
           ? currentDiamondsRaw
           : int.tryParse(currentDiamondsRaw?.toString() ?? '');
+      final currentUserWantToMeet =
+          (currentUser?['wanttomeet'] ?? AuthSession.instance.currentUser?['wanttomeet'])
+              ?.toString();
 
       final mappedProfiles = users
           .where((u) {
@@ -98,7 +107,14 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
             if (userId <= 0 || userId == currentUserId) {
               return false;
             }
-            return !excludedUserIds.contains(userId);
+            if (excludedUserIds.contains(userId)) {
+              return false;
+            }
+
+            return _matchesWantToMeetPreference(
+              wantToMeetRaw: currentUserWantToMeet,
+              candidateGenderRaw: u['gender'],
+            );
           })
           .map(_mapUserToProfileCard)
           .toList();
@@ -137,6 +153,27 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
     }
   }
 
+  bool _matchesWantToMeetPreference({
+    required String? wantToMeetRaw,
+    required dynamic candidateGenderRaw,
+  }) {
+    final wantToMeet = (wantToMeetRaw ?? '').toLowerCase().trim();
+    final candidateGender = (candidateGenderRaw?.toString() ?? '').toLowerCase().trim();
+
+    switch (wantToMeet) {
+      case 'man':
+        return candidateGender == 'male' || candidateGender == 'man';
+      case 'woman':
+        return candidateGender == 'female' || candidateGender == 'woman';
+      case 'everyone':
+      case 'anyone':
+      case '':
+        return true;
+      default:
+        return true;
+    }
+  }
+
   List<int> _extractUserIds(dynamic rawUsers) {
     if (rawUsers is! List) {
       return const [];
@@ -167,55 +204,91 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
     return ids;
   }
 
-  Future<Set<int>> _loadPendingRequestCounterpartyIds(int? currentUserId) async {
+  Future<Set<int>> _loadSentRequestCounterpartyIds(int? currentUserId) async {
     if (currentUserId == null) {
       return <int>{};
     }
 
     final sentUri = Uri.parse(
-      '${ApiConfig.baseUrl}/api/friend-requests/?requester=$currentUserId&status=pending',
+      '${ApiConfig.baseUrl}/api/friend-requests/?requester=$currentUserId',
     );
+
+    try {
+      final response = await http.get(sentUri).timeout(const Duration(seconds: 12));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return <int>{};
+      }
+
+      final decoded = jsonDecode(response.body);
+      final items = decoded is List
+          ? decoded
+          : (decoded is Map<String, dynamic> && decoded['results'] is List)
+              ? decoded['results'] as List<dynamic>
+              : const <dynamic>[];
+
+      final excludedIds = <int>{};
+      for (final item in items) {
+        if (item is! Map<String, dynamic>) {
+          continue;
+        }
+
+        final receiverId = item['receiver'] is int
+            ? item['receiver'] as int
+            : int.tryParse(item['receiver']?.toString() ?? '');
+
+        if (receiverId != null && receiverId != currentUserId) {
+          excludedIds.add(receiverId);
+        }
+      }
+
+      return excludedIds;
+    } catch (_) {
+      return <int>{};
+    }
+  }
+
+  Future<Set<int>> _loadPendingReceivedRequestCounterpartyIds(int? currentUserId) async {
+    if (currentUserId == null) {
+      return <int>{};
+    }
+
     final receivedUri = Uri.parse(
       '${ApiConfig.baseUrl}/api/friend-requests/?receiver=$currentUserId&status=pending',
     );
 
     try {
-      final responses = await Future.wait([
-        http.get(sentUri).timeout(const Duration(seconds: 12)),
-        http.get(receivedUri).timeout(const Duration(seconds: 12)),
-      ]);
-
       final excludedIds = <int>{};
-      for (final response in responses) {
-        if (response.statusCode < 200 || response.statusCode >= 300) {
+      final response = await http.get(receivedUri).timeout(const Duration(seconds: 12));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return <int>{};
+      }
+
+      final decoded = jsonDecode(response.body);
+      final items = decoded is List
+          ? decoded
+          : (decoded is Map<String, dynamic> && decoded['results'] is List)
+              ? decoded['results'] as List<dynamic>
+              : const <dynamic>[];
+
+      for (final item in items) {
+        if (item is! Map<String, dynamic>) {
           continue;
         }
 
-        final decoded = jsonDecode(response.body);
-        final items = decoded is List
-            ? decoded
-            : (decoded is Map<String, dynamic> && decoded['results'] is List)
-                ? decoded['results'] as List<dynamic>
-                : const <dynamic>[];
+        final requesterId = item['requester'] is int
+            ? item['requester'] as int
+            : int.tryParse(item['requester']?.toString() ?? '');
+        final receiverId = item['receiver'] is int
+            ? item['receiver'] as int
+            : int.tryParse(item['receiver']?.toString() ?? '');
 
-        for (final item in items) {
-          if (item is! Map<String, dynamic>) {
-            continue;
-          }
-
-          final requesterId = item['requester'] is int
-              ? item['requester'] as int
-              : int.tryParse(item['requester']?.toString() ?? '');
-          final receiverId = item['receiver'] is int
-              ? item['receiver'] as int
-              : int.tryParse(item['receiver']?.toString() ?? '');
-
-          if (requesterId != null && requesterId != currentUserId) {
-            excludedIds.add(requesterId);
-          }
-          if (receiverId != null && receiverId != currentUserId) {
-            excludedIds.add(receiverId);
-          }
+        if (requesterId != null && requesterId != currentUserId) {
+          excludedIds.add(requesterId);
+        }
+        if (receiverId != null && receiverId != currentUserId) {
+          excludedIds.add(receiverId);
         }
       }
 
@@ -541,7 +614,7 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
   }
 
   Future<void> _sendFriendRequest(ProfileCardData profile) async {
-    if (profile.userId <= 0 || _requestedUserIds.contains(profile.userId)) {
+    if (profile.userId <= 0) {
       return;
     }
 
@@ -550,11 +623,20 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
       return;
     }
 
-    final uri = Uri.parse('${ApiConfig.baseUrl}/api/friend-requests/');
+    final alreadyRequested = _requestedUserIds.contains(profile.userId);
+    if (alreadyRequested) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Friend request already sent to ${profile.name}.')),
+        );
+      }
+      return;
+    }
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/friend-requests/send-friend-request/');
     final payload = {
-      'requester': requesterId,
-      'receiver': profile.userId,
-      'status': 'pending',
+      'requester_id': requesterId,
+      'receiver_id': profile.userId,
     };
 
     try {
@@ -583,12 +665,22 @@ class _SwipeCardScreenState extends State<SwipeCardScreen> {
         return;
       }
 
-      final bodyText = response.body.toLowerCase();
-      final isAlreadyPending = bodyText.contains('already exists') ||
-          bodyText.contains('already friends') ||
-          bodyText.contains('pending friend request');
-      if (isAlreadyPending) {
-        _requestedUserIds.add(profile.userId);
+      final decodedBody = jsonDecode(response.body);
+      final detail = decodedBody is Map<String, dynamic>
+          ? (decodedBody['detail']?.toString() ?? decodedBody['error']?.toString())
+          : response.body;
+
+      if (response.statusCode == 400 && detail != null) {
+        if (detail.toLowerCase().contains('already exists') &&
+            detail.toLowerCase().contains('friend request')) {
+          _requestedUserIds.add(profile.userId);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(detail)),
+          );
+        }
       }
     } catch (_) {
       // Keep swipe fluid even when request send fails.
