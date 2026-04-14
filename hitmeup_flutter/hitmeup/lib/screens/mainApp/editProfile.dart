@@ -151,7 +151,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             color: Color(0xFF448AFF),
                           ),
                           child: ClipOval(
-                            child: _buildProfileImage(),
+                            child: Container(
+                              color: Colors.white,
+                              child: _buildProfileImage(),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),

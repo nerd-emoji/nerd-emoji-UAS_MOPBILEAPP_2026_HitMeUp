@@ -51,6 +51,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
   String? _playingVoiceUrl;
   bool _isVoicePlaying = false;
   final ImagePicker _imagePicker = ImagePicker();
+  Timer? _messagePollingTimer;
 
   String get _chatAvatarUrl {
     final value = (widget.chat.avatarUrl ?? '').trim();
@@ -88,12 +89,14 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
       });
     });
     _loadMessages();
+    _startMessagePolling();
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_handleScroll);
     _voiceRecordTimer?.cancel();
+    _messagePollingTimer?.cancel();
     unawaited(_audioRecorder.cancel());
     unawaited(_audioRecorder.dispose());
     unawaited(_audioPlayer.stop());
@@ -206,6 +209,45 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
       return idValue;
     }
     return int.tryParse(idValue.toString());
+  }
+
+  void _startMessagePolling() {
+    _messagePollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      if (mounted && !_isLoading) {
+        _pollForNewMessages();
+      }
+    });
+  }
+
+  Future<void> _pollForNewMessages() async {
+    if (_messages.isEmpty) {
+      return;
+    }
+
+    try {
+      final lastMessage = _messages.last;
+      final lastMessageId = _messageIdFromMessage(lastMessage);
+      if (lastMessageId == null) {
+        return;
+      }
+
+      final newMessages = await ChatService.fetchMessages(
+        widget.chat.id,
+        limit: _messagePageSize,
+        afterId: lastMessageId,
+      );
+
+      if (!mounted || newMessages.isEmpty) {
+        return;
+      }
+
+      setState(() {
+        _messages.addAll(newMessages);
+      });
+      _scrollToBottom();
+    } catch (_) {
+      // Silently ignore polling errors
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -1115,6 +1157,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: Colors.transparent,
       body: Container(
         color: const Color(0xFFFCE4EC),
@@ -1790,6 +1833,133 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     );
   }
 
+  Future<void> _showPollVotesDialog(Map<String, dynamic> poll) async {
+    final options = (poll['options'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(dialogContext).size.height * 0.7),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Poll votes',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: options.map((option) {
+                        final optionName = (option['optionName'] as String?)?.trim() ?? 'Option';
+                        final voteCount = option['voteCount'] is int
+                            ? option['voteCount'] as int
+                            : int.tryParse(option['voteCount'].toString()) ?? 0;
+                        final votes = (option['votes'] as List<dynamic>? ?? const <dynamic>[])
+                            .whereType<Map<String, dynamic>>()
+                            .toList();
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      optionName,
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$voteCount',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (votes.isEmpty)
+                                const Text(
+                                  'No votes yet',
+                                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                                )
+                              else
+                                Column(
+                                  children: votes.map((vote) {
+                                    final voterName = (vote['voterName'] as String?)?.trim();
+                                    final voterProfile = (vote['voterProfile'] as String?)?.trim();
+
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 15,
+                                            backgroundColor: Colors.grey.shade200,
+                                            backgroundImage: voterProfile != null && voterProfile.isNotEmpty
+                                                ? NetworkImage(_resolveMediaUrl(voterProfile))
+                                                : null,
+                                            child: (voterProfile == null || voterProfile.isEmpty)
+                                                ? const Icon(Icons.person, size: 16, color: Colors.black54)
+                                                : null,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              (voterName == null || voterName.isEmpty) ? 'Unknown user' : voterName,
+                                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildPollMessage(Map<String, dynamic> msg) {
     final isMe = msg['isMe'] as bool;
     final sender = msg['sender'] as String? ?? '';
@@ -1970,7 +2140,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                     const SizedBox(height: 6),
                     Container(height: 2, color: Colors.white),
                     TextButton(
-                      onPressed: () {},
+                        onPressed: () => _showPollVotesDialog(poll),
                       child: const Center(
                         child: Text(
                           'View votes',

@@ -962,10 +962,14 @@ class communityMessageViewSet(viewsets.ModelViewSet):
 			queryset = queryset.filter(community_id=community_id)
 
 		before_id = self.request.query_params.get("before_id")
+		after_id = self.request.query_params.get("after_id")
 		limit_value = self.request.query_params.get("limit")
 
 		if before_id:
 			queryset = queryset.filter(id__lt=before_id)
+
+		if after_id:
+			queryset = queryset.filter(id__gt=after_id)
 
 		if community_id and limit_value:
 			try:
@@ -1031,10 +1035,14 @@ class directMessageViewSet(viewsets.ModelViewSet):
 			queryset = queryset.filter(chat_id=chat_id)
 
 		before_id = self.request.query_params.get("before_id")
+		after_id = self.request.query_params.get("after_id")
 		limit_value = self.request.query_params.get("limit")
 
 		if before_id:
 			queryset = queryset.filter(id__lt=before_id)
+
+		if after_id:
+			queryset = queryset.filter(id__gt=after_id)
 
 		if chat_id and limit_value:
 			try:

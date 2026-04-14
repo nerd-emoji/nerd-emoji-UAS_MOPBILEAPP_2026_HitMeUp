@@ -88,6 +88,7 @@ class ChatService {
     int chatId, {
     int? limit,
     int? beforeId,
+    int? afterId,
   }) async {
     try {
       final queryParameters = <String, String>{'chat': chatId.toString()};
@@ -96,6 +97,9 @@ class ChatService {
       }
       if (beforeId != null) {
         queryParameters['before_id'] = beforeId.toString();
+      }
+      if (afterId != null) {
+        queryParameters['after_id'] = afterId.toString();
       }
 
       final response = await http.get(
@@ -119,6 +123,7 @@ class ChatService {
     int communityId, {
     int? limit,
     int? beforeId,
+    int? afterId,
   }) async {
     try {
       final queryParameters = <String, String>{'community': communityId.toString()};
@@ -127,6 +132,9 @@ class ChatService {
       }
       if (beforeId != null) {
         queryParameters['before_id'] = beforeId.toString();
+      }
+      if (afterId != null) {
+        queryParameters['after_id'] = afterId.toString();
       }
 
       final response = await http.get(

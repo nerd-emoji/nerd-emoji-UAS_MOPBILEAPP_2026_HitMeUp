@@ -1191,6 +1191,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: Colors.transparent,
       body: Container(
         color: const Color(0xFFFCE4EC),
