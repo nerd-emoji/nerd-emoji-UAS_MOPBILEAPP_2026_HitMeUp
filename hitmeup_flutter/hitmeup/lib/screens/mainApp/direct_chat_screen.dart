@@ -122,6 +122,42 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
 
   bool get _chatAvatarIsAsset => _chatAvatarUrl.startsWith('assets/');
 
+  List<Color> get _chatBackgroundGradientColors {
+    final normalizedGender = (widget.chat.gender ?? '').toLowerCase().trim();
+    if (normalizedGender == 'female' || normalizedGender == 'woman') {
+      return const [
+        Color(0xFFFF4081),
+        Color(0xFFF06292),
+        Color(0xFFE0F2F1),
+      ];
+    }
+
+    if (normalizedGender == 'male' || normalizedGender == 'man') {
+      return const [
+        Color(0xFF2962FF),
+        Color(0xFF5B98FF),
+        Color(0xFFE0F2F1),
+      ];
+    }
+
+    return const [
+      Color(0xFFFF4081),
+      Color(0xFFF06292),
+      Color(0xFFE0F2F1),
+    ];
+  }
+
+  Color get _chatAiBannerColor {
+    final normalizedGender = (widget.chat.gender ?? '').toLowerCase().trim();
+    if (normalizedGender == 'female' || normalizedGender == 'woman') {
+      return const Color(0xFF448AFF);
+    }
+    if (normalizedGender == 'male' || normalizedGender == 'man') {
+      return const Color(0xFFFF4081);
+    }
+    return const Color(0xFF448AFF);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1264,11 +1300,11 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
             Container(color: Colors.white, child: _buildAppBar(context)),
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFFFF4081), Color(0xFFFCE4EC)],
+                    colors: _chatBackgroundGradientColors,
                   ),
                 ),
                 child: Stack(
@@ -1345,7 +1381,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                         padding:
                             const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: AppColors.blueBottom,
+                          color: _chatAiBannerColor,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Row(
@@ -1724,20 +1760,6 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                       ),
                     ),
                     if (text.isNotEmpty) const SizedBox(height: 8),
-                    if (voiceUrl == null || voiceUrl.isEmpty) ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            time,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                   if (voiceUrl != null && voiceUrl.isNotEmpty) ...[
                     Container(
@@ -1800,8 +1822,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                       ],
                     ),
                   ],
-                  if ((voiceUrl == null || voiceUrl.isEmpty) &&
-                      (imageUrl == null || imageUrl.isEmpty))
+                  if (voiceUrl == null || voiceUrl.isEmpty)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment:
@@ -2121,7 +2142,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
               : int.tryParse(option['voteCount'].toString()) ?? 0),
     );
 
-          final contentColor = isMe ? Colors.white : Colors.black;
+          const contentColor = Colors.black;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

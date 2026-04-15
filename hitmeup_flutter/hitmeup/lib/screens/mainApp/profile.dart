@@ -62,7 +62,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoadingProfile = true;
   String? _profileError;
 
-  int _selectedBottomNavIndex = 4;
+  final int _selectedBottomNavIndex = 4;
 
   // Profile data
   String _name = 'Alfraz Aldebaran';

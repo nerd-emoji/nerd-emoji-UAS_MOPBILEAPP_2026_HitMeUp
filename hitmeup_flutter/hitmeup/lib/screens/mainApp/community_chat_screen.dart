@@ -2173,7 +2173,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
               : int.tryParse(option['voteCount'].toString()) ?? 0),
     );
 
-    final contentColor = isMe ? Colors.white : Colors.black;
+    const contentColor = Colors.black;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

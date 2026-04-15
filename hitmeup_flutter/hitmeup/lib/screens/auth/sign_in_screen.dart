@@ -155,9 +155,19 @@ class _SignInScreenState extends State<SignInScreen> {
         return;
       }
 
+      final backendError = _extractBackendError(response.body);
+      final normalizedBackendError = backendError.toLowerCase();
+      final isCredentialError = response.statusCode == 401 ||
+          response.statusCode == 403 ||
+          normalizedBackendError.contains('invalid username') ||
+          normalizedBackendError.contains('invalid password') ||
+          (normalizedBackendError.contains('invalid') &&
+              normalizedBackendError.contains('password'));
+
       setState(() {
-        _submitError =
-            'Login failed (${response.statusCode}): ${_extractBackendError(response.body)}';
+        _submitError = isCredentialError
+            ? 'Incorrect username or password'
+            : 'Login failed (${response.statusCode}): $backendError';
       });
     } catch (_) {
       if (!mounted) {

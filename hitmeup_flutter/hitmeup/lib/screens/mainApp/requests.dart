@@ -63,9 +63,6 @@ class _RequestsScreenState extends State<RequestsScreen> {
     color: Colors.white,
   );
 
-  static const Color _profileLevelBackgroundColor =
-      Color.fromRGBO(204, 204, 204, 1);
-
   int _diamondBalance = 17;
   int _selectedBottomNavIndex = 1;
   String _currentUserName = 'Alfraz Aldebaran';
@@ -143,7 +140,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
           ? diamondsRaw
           : int.tryParse(diamondsRaw?.toString() ?? '') ?? 0;
 
-      if (!mounted || diamonds == null) {
+      if (!mounted) {
         return;
       }
 
@@ -207,7 +204,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
             : int.tryParse(requesterIdRaw?.toString() ?? '');
         final requestId = requestIdRaw is int
             ? requestIdRaw
-            : int.tryParse(requestIdRaw?.toString() ?? '') ?? 0;
+            : int.tryParse(requestIdRaw?.toString() ?? '');
 
         if (requesterId == null || requestId == null) {
           continue;
@@ -397,11 +394,9 @@ class _RequestsScreenState extends State<RequestsScreen> {
             final diamonds = diamondsRaw is int
                 ? diamondsRaw
                 : int.tryParse(diamondsRaw?.toString() ?? '') ?? 0;
-            if (diamonds != null) {
-              setState(() {
-                _diamondBalance = diamonds;
-              });
-            }
+            setState(() {
+              _diamondBalance = diamonds;
+            });
           }
         }
       }

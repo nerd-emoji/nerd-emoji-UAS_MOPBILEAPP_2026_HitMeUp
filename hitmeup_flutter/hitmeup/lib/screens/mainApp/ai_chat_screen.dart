@@ -2,13 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../services/auth_session.dart';
 import '../../services/chat_service.dart';
-import '../../theme/app_theme.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({
@@ -462,11 +460,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
+
 
   void _scrollToBottom({bool animated = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -718,19 +712,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
       'isFromAI': isFromAI,
       'recommendedUserIds': recommendationIds,
     };
-  }
-
-  String _formatTime(String dateTimeString) {
-    try {
-      final wibTime = DateTime.parse(dateTimeString)
-          .toUtc()
-          .add(const Duration(hours: 7));
-      final hour = wibTime.hour.toString().padLeft(2, '0');
-      final minute = wibTime.minute.toString().padLeft(2, '0');
-      return '$hour:$minute';
-    } catch (_) {
-      return '';
-    }
   }
 
   @override
@@ -1011,7 +992,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                               color: Colors.black87,
                             ),
                             const SizedBox(width: 8),
-                            Text(
+                            const Text(
                               'Voice message',
                               style: _chatBubbleTextStyle,
                             ),

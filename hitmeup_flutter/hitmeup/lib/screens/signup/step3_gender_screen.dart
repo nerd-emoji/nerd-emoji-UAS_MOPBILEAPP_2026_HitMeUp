@@ -9,12 +9,14 @@ class Step2GenderScreen extends StatefulWidget {
     required this.email,
     required this.password,
     required this.birthday,
+    required this.showBirthday,
   });
 
   final String name;
   final String email;
   final String password;
   final DateTime birthday;
+  final bool showBirthday;
 
   @override
   State<Step2GenderScreen> createState() => _Step2GenderScreenState();
@@ -191,6 +193,7 @@ class _Step2GenderScreenState extends State<Step2GenderScreen> {
                 email: widget.email,
                 password: widget.password,
                 birthday: widget.birthday,
+                showBirthday: widget.showBirthday,
                 gender: backendGender,
               ),
             ),

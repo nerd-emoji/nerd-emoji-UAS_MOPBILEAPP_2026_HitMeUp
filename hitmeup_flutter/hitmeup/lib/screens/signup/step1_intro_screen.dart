@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_config.dart';
-import 'step3_birthday_screen.dart';
+import 'step2_birthday_screen.dart';
 
 class Step1IntroScreen extends StatefulWidget {
   final String? initialName;
@@ -81,6 +81,22 @@ class _Step1IntroScreenState extends State<Step1IntroScreen> {
     super.dispose();
   }
 
+  String? _validatePassword(String password) {
+    if (password.length < 10) {
+      return 'Password must be at least 10 characters long.';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      return 'Password must include at least one uppercase letter.';
+    }
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      return 'Password must include at least one lowercase letter.';
+    }
+    if (!RegExp(r'[0-9]').hasMatch(password)) {
+      return 'Password must include at least one number.';
+    }
+    return null;
+  }
+
   Future<void> _onContinuePressed() async {
     if (_isCheckingEmail) return;
 
@@ -98,6 +114,14 @@ class _Step1IntroScreenState extends State<Step1IntroScreen> {
     if (!email.contains('@')) {
       setState(() {
         _errorText = 'Please enter a valid email address.';
+      });
+      return;
+    }
+
+    final passwordValidationError = _validatePassword(password);
+    if (passwordValidationError != null) {
+      setState(() {
+        _errorText = passwordValidationError;
       });
       return;
     }

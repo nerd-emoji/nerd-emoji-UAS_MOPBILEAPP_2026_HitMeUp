@@ -15,6 +15,7 @@ class Step4LocationScreen extends StatefulWidget {
     required this.password,
     required this.gender,
     required this.birthday,
+    required this.showBirthday,
   });
 
   final String name;
@@ -22,6 +23,7 @@ class Step4LocationScreen extends StatefulWidget {
   final String password;
   final String gender;
   final DateTime birthday;
+  final bool showBirthday;
 
   @override
   State<Step4LocationScreen> createState() => _Step4LocationScreenState();
@@ -388,6 +390,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
                       password: widget.password,
                       gender: widget.gender,
                       birthday: widget.birthday,
+                      showBirthday: widget.showBirthday,
                       location: _selectedLocation.trim(),
                     ),
                   ),

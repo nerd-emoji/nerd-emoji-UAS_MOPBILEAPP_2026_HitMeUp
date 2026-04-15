@@ -4,6 +4,7 @@ class DirectChat {
   final int user1;
   final int user2;
   final String name;
+  final String? gender;
   final String lastMessage;
   final String? avatarUrl;
   final String? createdAt;
@@ -14,6 +15,7 @@ class DirectChat {
     required this.user1,
     required this.user2,
     required this.name,
+    this.gender,
     required this.lastMessage,
     this.avatarUrl,
     this.createdAt,
@@ -23,12 +25,14 @@ class DirectChat {
   factory DirectChat.fromJson(Map<String, dynamic> json, {
     required String otherUserName,
     String? otherUserAvatar,
+    String? otherUserGender,
   }) {
     return DirectChat(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       user1: json['user1'] is int ? json['user1'] : int.parse(json['user1'].toString()),
       user2: json['user2'] is int ? json['user2'] : int.parse(json['user2'].toString()),
       name: otherUserName,
+      gender: otherUserGender,
       lastMessage: json['lastMessage'] as String? ?? '',
       avatarUrl: otherUserAvatar,
       createdAt: json['created_at'] as String?,

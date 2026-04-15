@@ -479,6 +479,7 @@ class _ChatScreenState extends State<ChatScreen> {
             chatData,
             otherUserName: otherUser['name'] as String? ?? 'Unknown',
             otherUserAvatar: otherUser['profilepicture'] as String?,
+            otherUserGender: otherUser['gender'] as String?,
           );
           directChats.add(directChat);
         } catch (e) {

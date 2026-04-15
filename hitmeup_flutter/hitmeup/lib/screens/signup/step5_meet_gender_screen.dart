@@ -10,6 +10,7 @@ class Step5MeetGenderScreen extends StatefulWidget {
     required this.password,
     required this.gender,
     required this.birthday,
+    required this.showBirthday,
     required this.location,
   });
 
@@ -18,6 +19,7 @@ class Step5MeetGenderScreen extends StatefulWidget {
   final String password;
   final String gender;
   final DateTime birthday;
+  final bool showBirthday;
   final String location;
 
   @override
@@ -163,6 +165,7 @@ class _Step5MeetGenderScreenState extends State<Step5MeetGenderScreen> {
                 password: widget.password,
                 gender: widget.gender,
                 birthday: widget.birthday,
+                showBirthday: widget.showBirthday,
                 location: widget.location,
                 meetGender: _selected,
               ),

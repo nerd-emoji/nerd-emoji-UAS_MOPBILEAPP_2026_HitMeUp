@@ -17,6 +17,7 @@ class Step6InterestsScreen extends StatefulWidget {
     required this.password,
     required this.gender,
     required this.birthday,
+    required this.showBirthday,
     required this.location,
     this.meetGender,
   });
@@ -26,6 +27,7 @@ class Step6InterestsScreen extends StatefulWidget {
   final String password;
   final String gender;
   final DateTime birthday;
+  final bool showBirthday;
   final String location;
   final String? meetGender;
 
@@ -293,6 +295,7 @@ class _Step6InterestsScreenState extends State<Step6InterestsScreen> {
       'password': widget.password,
       'gender': widget.gender,
       'birthday': widget.birthday.toIso8601String().split('T').first,
+      'showbirthday': widget.showBirthday,
       'location': widget.location,
       'intrest1': selectedInterests.isNotEmpty ? selectedInterests[0] : '',
       'intrest2': selectedInterests.length > 1 ? selectedInterests[1] : '',
