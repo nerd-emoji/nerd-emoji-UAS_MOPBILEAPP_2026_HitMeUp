@@ -492,6 +492,8 @@ def _build_gemini_contents(chat_obj):
 	system_prompt = (
 		f"You are Chat.AI inside HitMeUp. Be concise, practical, and friendly. "
 		"Do not prefix your responses with labels like [AI]:, AI:, or Assistant:. "
+		"If you are not sure, do not have enough app-specific data, or the user asks about a technical app error you cannot clearly verify, do not invent steps. "
+		"Clearly say you are not sure and ask the user to contact support. "
 		f"The main user talking to you is {main_user_name}. "
 		f"{_summarize_ai_chat_context(chat_obj)}"
 	)
@@ -607,7 +609,142 @@ def _build_gemini_continuation_prompt(reply_text):
 	)
 
 
+def _detect_diamond_question(text_value):
+	if not text_value:
+		return False
+
+	text = text_value.lower()
+	diamond_keywords = [
+		"diamond",
+		"diamonds",
+		"currency",
+		"coins",
+		"koin",
+		"earn diamonds",
+		"get diamonds",
+	]
+	question_keywords = [
+		"how",
+		"get",
+		"earn",
+		"obtain",
+		"receive",
+		"make",
+		"cara",
+		"bagaimana",
+		"gimana",
+		"mendapat",
+		"mendapatkan",
+		"dapetin",
+		"memperoleh",
+	]
+	return _contains_any_keyword(text, diamond_keywords) and _contains_any_keyword(text, question_keywords)
+
+
+def _is_bahasa_indonesia_text(text_value):
+	if not text_value:
+		return False
+
+	text = text_value.lower()
+	indonesian_markers = [
+		" cara ",
+		"bagaimana",
+		"gimana",
+		"aku",
+		"saya",
+		"kamu",
+		"teman",
+		"mendapat",
+		"dapetin",
+		"koin",
+	]
+
+	normalized = f" {text} "
+	return _contains_any_keyword(normalized, indonesian_markers)
+
+
+def _build_diamond_answer(user_prompt_text):
+	if _is_bahasa_indonesia_text(user_prompt_text):
+		return (
+			"Kamu bisa mendapatkan diamonds dengan mengirim friend request lalu menunggu sampai diterima, "
+			"atau dengan menerima friend request yang masuk ke kamu. "
+			"Friend request yang diterima memberi 5 diamonds ke kedua user, dan mengirim friend request membutuhkan 2 diamonds."
+		)
+
+	return (
+		"You can get diamonds by sending a friend request and waiting for it to be accepted, or by accepting a friend request sent to you. "
+		"An accepted friend request gives 5 diamonds to both users, and sending a friend request costs 2 diamonds."
+	)
+
+
+def _detect_technical_issue_question(text_value):
+	if not text_value:
+		return False
+
+	text = text_value.lower()
+	technical_issue_keywords = [
+		"error",
+		"bug",
+		"crash",
+		"not working",
+		"doesn't work",
+		"cant",
+		"can't",
+		"failed",
+		"failure",
+		"technical",
+		"issue",
+		"problem",
+		"login error",
+		"network error",
+		"timeout",
+		"invalid",
+		"gagal",
+		"error teknis",
+		"kendala",
+		"masalah",
+		"tidak bisa",
+		"nggak bisa",
+		"ga bisa",
+		"tidak berfungsi",
+		"bermasalah",
+		"bug aplikasi",
+	]
+
+	app_scope_keywords = [
+		"app",
+		"aplikasi",
+		"hitmeup",
+		"chat",
+		"profile",
+		"friend request",
+		"community",
+		"login",
+	]
+
+	return _contains_any_keyword(text, technical_issue_keywords) and _contains_any_keyword(text, app_scope_keywords)
+
+
+def _build_support_contact_answer(user_prompt_text):
+	if _is_bahasa_indonesia_text(user_prompt_text):
+		return (
+			"Maaf, aku belum punya informasi yang cukup jelas untuk memberikan langkah perbaikan yang akurat. "
+			"Supaya tidak memberi panduan yang salah, silakan hubungi tim support HitMeUp."
+		)
+
+	return (
+		"Sorry, I do not have enough verified information to provide a reliable fix. "
+		"To avoid giving incorrect guidance, please contact HitMeUp support."
+	)
+
+
 def _generate_gemini_reply(chat_obj):
+	latest_prompt = _latest_user_prompt_text(chat_obj)
+	if _detect_diamond_question(latest_prompt):
+		return _build_diamond_answer(latest_prompt)
+	if _detect_technical_issue_question(latest_prompt):
+		return _build_support_contact_answer(latest_prompt)
+
 	if not GEMINI_API_KEY:
 		raise RuntimeError("Gemini API key is not configured on the backend. Set GEMINI_API_KEY environment variable.")
 

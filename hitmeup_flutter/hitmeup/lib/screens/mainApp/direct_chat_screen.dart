@@ -1532,7 +1532,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
           CircleAvatar(
             radius: 28,
             backgroundColor:
-                AppColors.pinkTop.withOpacity(0.2),
+                AppColors.white.withOpacity(0.2),
             child: ClipOval(
               child: SizedBox(
                 width: 56,

@@ -118,18 +118,24 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
-  String _screenSubtitle() {
-    final title = widget.contextTitle?.trim();
-    if (title != null && title.isNotEmpty) {
-      return title;
-    }
+  String _appBarTitle() {
+    final contextName = widget.contextTitle?.trim();
+
     if (widget.contextUserId != null) {
-      return 'AI chat in direct context';
+      final friendName = (contextName == null || contextName.isEmpty)
+          ? 'teman ini'
+          : contextName;
+      return 'Kembali ke chat dengan "$friendName"';
     }
+
     if (widget.contextCommunityId != null) {
-      return 'AI chat in community context';
+      final communityName = (contextName == null || contextName.isEmpty)
+          ? 'komunitas ini'
+          : contextName;
+      return 'Kembali ke chat di "$communityName"';
     }
-    return 'Personal AI chat';
+
+    return 'Chat.AI';
   }
 
   String? _resolveProfileUrl(dynamic rawPath) {
@@ -219,7 +225,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           _isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to initialize AI chat: $e')),
+          SnackBar(content: Text(_formatErrorMessage(error: e, fallback: 'Failed to initialize AI chat.'))),
         );
       }
     }
@@ -252,7 +258,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading AI messages: $e')),
+          SnackBar(content: Text(_formatErrorMessage(error: e, fallback: 'Error loading AI messages.'))),
         );
       }
     }
@@ -307,7 +313,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading older AI messages: $e')),
+          SnackBar(content: Text(_formatErrorMessage(error: e, fallback: 'Error loading older AI messages.'))),
         );
       }
     } finally {
@@ -367,7 +373,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (mounted) {
         setState(() => _isSending = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending AI message: $e')),
+          SnackBar(content: Text(_formatErrorMessage(error: e, fallback: 'Error sending AI message.'))),
         );
       }
     } finally {
@@ -409,10 +415,32 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (mounted) {
         setState(_removeAssistantTypingPlaceholder);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate AI reply: $e')),
+          SnackBar(content: Text(_formatErrorMessage(error: e, fallback: 'Failed to generate AI reply.'))),
         );
       }
     }
+  }
+
+  String _formatErrorMessage({
+    required Object error,
+    required String fallback,
+  }) {
+    if (error is ChatServiceException) {
+      final prefix = error.source == ChatErrorSource.aiApi
+          ? 'AI API error'
+          : 'App error';
+      final detail = error.message.trim();
+      if (detail.isEmpty) {
+        return '$prefix: $fallback';
+      }
+      return '$prefix: $detail';
+    }
+
+    final detail = error.toString().trim();
+    if (detail.isEmpty) {
+      return 'App error: $fallback';
+    }
+    return 'App error: $detail';
   }
 
   String _resolveMediaUrl(String rawUrl) {
@@ -822,6 +850,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildAppBar(BuildContext context) {
+    final isContextHeader =
+        widget.contextUserId != null || widget.contextCommunityId != null;
+
     return Padding(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top,
@@ -835,30 +866,55 @@ class _AiChatScreenState extends State<AiChatScreen> {
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Colors.black),
             onPressed: () => Navigator.pop(context),
           ),
-          Image.asset(
-            'assets/AIBrain.png',
-            width: 28,
-            height: 28,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, size: 28, color: Colors.black),
+          if (!isContextHeader) ...[
+            Image.asset(
+              'assets/AIBrain.png',
+              width: 28,
+              height: 28,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(Icons.psychology_rounded, size: 28, color: Colors.black),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              _appBarTitle(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: isContextHeader ? 16 : 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Chat.AI',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
-                ),
-                Text(
-                  _screenSubtitle(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600),
-                ),
-              ],
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(color: const Color(0xFF448AFF), width: 2),
+            ),
+            child: CircleAvatar(
+              radius: 14,
+              backgroundColor: Colors.black12,
+              backgroundImage:
+                  _mainUserProfileUrl != null ? NetworkImage(_mainUserProfileUrl!) : null,
+              onBackgroundImageError: _mainUserProfileUrl != null
+                  ? (_, __) {
+                      if (!mounted) {
+                        return;
+                      }
+                      setState(() {
+                        _mainUserProfileUrl = null;
+                      });
+                    }
+                  : null,
+              child: _mainUserProfileUrl == null
+                  ? const Icon(Icons.person, color: Colors.black54, size: 18)
+                  : null,
             ),
           ),
         ],
@@ -1008,25 +1064,34 @@ class _AiChatScreenState extends State<AiChatScreen> {
           if (isMe)
             Padding(
               padding: const EdgeInsets.only(left: 8),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.black12,
-                backgroundImage: _mainUserProfileUrl != null
-                    ? NetworkImage(_mainUserProfileUrl!)
-                    : null,
-                onBackgroundImageError: _mainUserProfileUrl != null
-                    ? (_, __) {
-                        if (!mounted) {
-                          return;
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFF448AFF), width: 2),
+                ),
+                child: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Colors.black12,
+                  backgroundImage: _mainUserProfileUrl != null
+                      ? NetworkImage(_mainUserProfileUrl!)
+                      : null,
+                  onBackgroundImageError: _mainUserProfileUrl != null
+                      ? (_, __) {
+                          if (!mounted) {
+                            return;
+                          }
+                          setState(() {
+                            _mainUserProfileUrl = null;
+                          });
                         }
-                        setState(() {
-                          _mainUserProfileUrl = null;
-                        });
-                      }
-                    : null,
-                child: _mainUserProfileUrl == null
-                    ? const Icon(Icons.person, color: Colors.black54, size: 18)
-                    : null,
+                      : null,
+                  child: _mainUserProfileUrl == null
+                      ? const Icon(Icons.person, color: Colors.black54, size: 18)
+                      : null,
+                ),
               ),
             )
           else if (isFromAI)

@@ -4,6 +4,24 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
 
+enum ChatErrorSource {
+  app,
+  aiApi,
+}
+
+class ChatServiceException implements Exception {
+  const ChatServiceException({
+    required this.source,
+    required this.message,
+  });
+
+  final ChatErrorSource source;
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class ChatService {
   ChatService._();
 
@@ -335,10 +353,54 @@ class ChatService {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
 
-      throw Exception('Failed to generate AI reply: ${response.statusCode} ${response.body}');
+      final source = _classifyAiReplyErrorSource(response);
+      final detail = _extractBackendDetail(response.body);
+      final fallback = 'Failed to generate AI reply (${response.statusCode}).';
+      throw ChatServiceException(
+        source: source,
+        message: detail.isNotEmpty ? detail : fallback,
+      );
+    } on ChatServiceException {
+      rethrow;
     } catch (e) {
-      throw Exception('Error generating AI reply: $e');
+      throw ChatServiceException(
+        source: ChatErrorSource.app,
+        message: 'Failed to reach app backend while generating AI reply.',
+      );
     }
+  }
+
+  static ChatErrorSource _classifyAiReplyErrorSource(http.Response response) {
+    if (response.statusCode == 502) {
+      return ChatErrorSource.aiApi;
+    }
+
+    final detail = _extractBackendDetail(response.body).toLowerCase();
+    if (detail.contains('gemini') || detail.contains('api key') || detail.contains('generatecontent')) {
+      return ChatErrorSource.aiApi;
+    }
+
+    return ChatErrorSource.app;
+  }
+
+  static String _extractBackendDetail(String body) {
+    if (body.trim().isEmpty) {
+      return '';
+    }
+
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail']?.toString().trim();
+        if (detail != null && detail.isNotEmpty) {
+          return detail;
+        }
+      }
+    } catch (_) {
+      // Fall back to plain text body.
+    }
+
+    return body.trim();
   }
 
   /// Send a user AI image message.
