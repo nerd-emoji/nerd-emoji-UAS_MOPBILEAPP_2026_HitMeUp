@@ -1,3 +1,5 @@
+Link Sheets: https://docs.google.com/spreadsheets/d/1qLHUoV8_t2ZmgavYU5jE0ZaAEU0zKQ7jG0_gbANweSI/edit?usp=sharing 
+
 run dengan emulator pakai: 
 flutter run
 
