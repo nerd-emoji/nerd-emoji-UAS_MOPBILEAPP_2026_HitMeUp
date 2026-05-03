@@ -1,0 +1,50 @@
+# ======================
+# PYTHON
+# ======================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ======================
+# LOGS
+# ======================
+*.log
+
+# ======================
+# FLUTTER / DART
+# ======================
+.dart_tool/
+.pub/
+.pub-cache/
+/build/
+/coverage/
+
+# ======================
+# ANDROID
+# ======================
+android/.gradle/
+android/local.properties
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ======================
+# IDE
+# ======================
+.idea/
+.vscode/
+
+# ======================
+# OS FILES
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# MISC
+# ======================
+*.swp
+*.class
+.history
+.svn/
