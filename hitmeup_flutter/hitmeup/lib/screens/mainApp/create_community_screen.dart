@@ -11,7 +11,29 @@ import '../../services/auth_session.dart';
 import 'dart:typed_data';
 
 class CreateCommunityScreen extends StatefulWidget {
-  const CreateCommunityScreen({super.key});
+  /// Optional testing hooks: provide initial image bytes or initial creating state.
+  const CreateCommunityScreen({
+    super.key,
+    this.testInitialPickedImageBytes,
+    this.testInitialIsCreating,
+    this.enableTestActions = false,
+    this.testCreateCommunity,
+    this.testAddUserToCommunity,
+  });
+
+  final Uint8List? testInitialPickedImageBytes;
+  final bool? testInitialIsCreating;
+  final bool enableTestActions;
+  // Integration / test hooks to override network behavior.
+  final Future<Map<String, dynamic>> Function({
+    required String name,
+    required String description,
+    required int maxParticipants,
+    Uint8List? communityPictureBytes,
+    String? pictureName,
+  })? testCreateCommunity;
+
+  final Future<void> Function({required int userId, required int communityId})? testAddUserToCommunity;
 
   @override
   State<CreateCommunityScreen> createState() => _CreateCommunityScreenState();
@@ -88,6 +110,19 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   Uint8List? _pickedCommunityImageBytes;
   bool _isPickingImage = false;
   bool _isCreating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Apply test overrides if present.
+    final widgetRef = (widget as CreateCommunityScreen);
+    if (widgetRef.testInitialPickedImageBytes != null) {
+      _pickedCommunityImageBytes = widgetRef.testInitialPickedImageBytes;
+    }
+    if (widgetRef.testInitialIsCreating == true) {
+      _isCreating = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -168,6 +203,16 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                         textAlign: TextAlign.center,
                       ),
                     ),
+                    // Test-only hook: provide a hidden button to show permission dialog
+                    if (widget.enableTestActions)
+                      Offstage(
+                        offstage: false,
+                        child: TextButton(
+                          key: const Key('test_show_permission_dialog'),
+                          onPressed: _showGalleryPermissionSettingsDialog,
+                          child: const SizedBox.shrink(),
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     Container(
                       width: 211,
@@ -478,15 +523,25 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
     });
 
     try {
-      final createdCommunity = await ChatService.createCommunity(
-        name: name,
-        description: description,
-        maxParticipants: maxParticipants,
-        communityPictureBytes: _pickedCommunityImageBytes,
-        pictureName: _pickedCommunityImageBytes != null
-            ? 'community_${DateTime.now().millisecondsSinceEpoch}.jpg'
-            : null,
-      );
+      final createdCommunity = await (widget.testCreateCommunity != null
+          ? widget.testCreateCommunity!(
+              name: name,
+              description: description,
+              maxParticipants: maxParticipants,
+              communityPictureBytes: _pickedCommunityImageBytes,
+              pictureName: _pickedCommunityImageBytes != null
+                  ? 'community_${DateTime.now().millisecondsSinceEpoch}.jpg'
+                  : null,
+            )
+          : ChatService.createCommunity(
+              name: name,
+              description: description,
+              maxParticipants: maxParticipants,
+              communityPictureBytes: _pickedCommunityImageBytes,
+              pictureName: _pickedCommunityImageBytes != null
+                  ? 'community_${DateTime.now().millisecondsSinceEpoch}.jpg'
+                  : null,
+            ));
 
       if (!mounted) return;
 
@@ -495,10 +550,11 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
       final userId = AuthSession.instance.userId;
       if (userId != null) {
         try {
-          await ChatService.addUserToCommunity(
-            userId: userId,
-            communityId: communityId,
-          );
+          if (widget.testAddUserToCommunity != null) {
+            await widget.testAddUserToCommunity!(userId: userId, communityId: communityId);
+          } else {
+            await ChatService.addUserToCommunity(userId: userId, communityId: communityId);
+          }
         } catch (e) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(

@@ -9,6 +9,7 @@ import 'profile.dart';
 import '../../services/api_config.dart';
 import '../../services/auth_session.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/requests_utils.dart';
 
 class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
@@ -70,7 +71,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
   String? _currentUserProfilePictureUrl;
   bool _isLoadingRequests = true;
   String? _requestsError;
-  final List<_FriendRequestCardData> _incomingRequests = [];
+  final List<FriendRequestCardData> _incomingRequests = [];
 
   @override
   void initState() {
@@ -111,7 +112,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
       _currentUserLevel = 'Level ${level < 1 ? 1 : level}';
     }
     _currentUserProfilePictureUrl =
-        _resolveProfilePictureUrl(profilePictureRaw);
+        RequestsUtils.resolveProfilePictureUrl(profilePictureRaw);
   }
 
   Future<void> _loadLoggedInUserDiamonds() async {
@@ -194,7 +195,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
 
       final requestMaps =
           requestJson.whereType<Map<String, dynamic>>().toList();
-      final cards = <_FriendRequestCardData>[];
+      final cards = <FriendRequestCardData>[];
 
       for (final request in requestMaps) {
         final requesterIdRaw = request['requester'];
@@ -215,7 +216,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
           continue;
         }
 
-        cards.add(_mapRequestToCard(
+        cards.add(RequestsUtils.mapRequestToCard(
           requestId: requestId,
           requesterId: requesterId,
           requesterData: requesterUser,
@@ -264,92 +265,10 @@ class _RequestsScreenState extends State<RequestsScreen> {
     return null;
   }
 
-  _FriendRequestCardData _mapRequestToCard({
-    required int requestId,
-    required int requesterId,
-    required Map<String, dynamic> requesterData,
-  }) {
-    final name = (requesterData['name'] as String?)?.trim();
-    final birthdayRaw = (requesterData['birthday'] as String?)?.trim();
-    final age = _calculateAgeFromBirthday(birthdayRaw);
-    final levelRaw = requesterData['level'];
-    final level = levelRaw is int
-        ? levelRaw
-        : int.tryParse(levelRaw?.toString() ?? '') ?? 1;
-    final diamondsRaw = requesterData['diamonds'];
-    final diamonds = diamondsRaw is int
-        ? diamondsRaw
-        : int.tryParse(diamondsRaw?.toString() ?? '') ?? 0;
 
-    return _FriendRequestCardData(
-      requestId: requestId,
-      requesterId: requesterId,
-      name: name != null && name.isNotEmpty ? name : 'Unknown User',
-      age: age,
-      level: level < 1 ? 1 : level,
-      diamonds: diamonds,
-      imageUrl: _resolveProfilePictureUrl(
-        (requesterData['profilepicture'] as String?)?.trim(),
-      ),
-    );
-  }
-
-  int _calculateAgeFromBirthday(String? birthdayRaw) {
-    if (birthdayRaw == null || birthdayRaw.isEmpty) {
-      return 0;
-    }
-
-    final birthday = DateTime.tryParse(birthdayRaw);
-    if (birthday == null) {
-      return 0;
-    }
-
-    final now = DateTime.now();
-    var age = now.year - birthday.year;
-    final hasHadBirthdayThisYear = now.month > birthday.month ||
-        (now.month == birthday.month && now.day >= birthday.day);
-    if (!hasHadBirthdayThisYear) {
-      age -= 1;
-    }
-    return age < 0 ? 0 : age;
-  }
-
-  String? _resolveProfilePictureUrl(String? rawUrl) {
-    if (rawUrl == null || rawUrl.isEmpty) {
-      return null;
-    }
-
-    final normalizedRaw = rawUrl.replaceAll('\\', '/').trim();
-    if (normalizedRaw.isEmpty) {
-      return null;
-    }
-
-    final parsed = Uri.tryParse(normalizedRaw);
-    final apiBase = Uri.parse(ApiConfig.baseUrl);
-
-    if (parsed != null && parsed.hasScheme) {
-      final isLocalHost =
-          parsed.host == '127.0.0.1' || parsed.host == 'localhost';
-      if (isLocalHost && apiBase.host != parsed.host) {
-        return apiBase
-            .replace(
-              path: parsed.path,
-              query: parsed.query,
-              fragment: parsed.fragment,
-            )
-            .toString();
-      }
-      return normalizedRaw;
-    }
-
-    final base = Uri.parse('${ApiConfig.baseUrl}/');
-    final withMediaPrefix =
-        normalizedRaw.startsWith('/') ? normalizedRaw : '/media/$normalizedRaw';
-    return base.resolve(withMediaPrefix).toString();
-  }
 
   Future<void> _updateRequestStatus(
-    _FriendRequestCardData request,
+    FriendRequestCardData request,
     String status,
   ) async {
     final uri = Uri.parse(
@@ -411,7 +330,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
     }
   }
 
-  void _showRequestResultDialog(_FriendRequestCardData data, bool accepted) {
+  void _showRequestResultDialog(FriendRequestCardData data, bool accepted) {
     showDialog(
       context: context,
       barrierColor: Colors.black87,
@@ -707,7 +626,7 @@ class _RequestCard extends StatelessWidget {
       required this.cardLevelTextStyle,
       required this.onAccept,
       required this.onReject});
-  final _FriendRequestCardData data;
+  final FriendRequestCardData data;
   final TextStyle cardNameTextStyle;
   final TextStyle cardLevelTextStyle;
   final VoidCallback onAccept;
@@ -854,25 +773,6 @@ class _RequestCard extends StatelessWidget {
   }
 }
 
-class _FriendRequestCardData {
-  const _FriendRequestCardData({
-    required this.requestId,
-    required this.requesterId,
-    required this.name,
-    required this.age,
-    required this.level,
-    required this.imageUrl,
-    required this.diamonds,
-  });
-
-  final int requestId;
-  final int requesterId;
-  final String name;
-  final int age;
-  final int level;
-  final String? imageUrl;
-  final int diamonds;
-}
 
 class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar({required this.selectedIndex, required this.onItemTap});
