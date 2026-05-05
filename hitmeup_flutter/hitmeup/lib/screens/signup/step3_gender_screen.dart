@@ -10,6 +10,7 @@ class Step2GenderScreen extends StatefulWidget {
     required this.password,
     required this.birthday,
     required this.showBirthday,
+    this.testOnNavigate,
   });
 
   final String name;
@@ -17,6 +18,7 @@ class Step2GenderScreen extends StatefulWidget {
   final String password;
   final DateTime birthday;
   final bool showBirthday;
+  final void Function(String name, String email, String password, DateTime birthday, bool showBirthday, String gender)? testOnNavigate;
 
   @override
   State<Step2GenderScreen> createState() => _Step2GenderScreenState();
@@ -102,7 +104,7 @@ class _Step2GenderScreenState extends State<Step2GenderScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 240),
+                      const Spacer(),
                       Text(
                         'Make friends with people\nwho match your vibe!',
                         style: _headerTextStyle.copyWith(
@@ -117,7 +119,7 @@ class _Step2GenderScreenState extends State<Step2GenderScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(height: 24),
                       _buildContinueButton(),
                       const SizedBox(height: 24),
                     ],
@@ -185,19 +187,23 @@ class _Step2GenderScreenState extends State<Step2GenderScreen> {
 
           final backendGender = _selectedGender == 'Woman' ? 'female' : 'male';
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => Step4LocationScreen(
-                name: widget.name,
-                email: widget.email,
-                password: widget.password,
-                birthday: widget.birthday,
-                showBirthday: widget.showBirthday,
-                gender: backendGender,
+          if (widget.testOnNavigate != null) {
+            widget.testOnNavigate!(widget.name, widget.email, widget.password, widget.birthday, widget.showBirthday, backendGender);
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => Step4LocationScreen(
+                  name: widget.name,
+                  email: widget.email,
+                  password: widget.password,
+                  birthday: widget.birthday,
+                  showBirthday: widget.showBirthday,
+                  gender: backendGender,
+                ),
               ),
-            ),
-          );
+            );
+          }
         },
         child: const Text(
           'CONTINUE',

@@ -10,11 +10,13 @@ class Step3BirthdayScreen extends StatefulWidget {
     required this.name,
     required this.email,
     required this.password,
+    this.testOnNavigate,
   });
 
   final String name;
   final String email;
   final String password;
+  final void Function(String name, String email, String password, DateTime birthday, bool showBirthday)? testOnNavigate;
 
   @override
   State<Step3BirthdayScreen> createState() => _Step3BirthdayScreenState();
@@ -140,12 +142,15 @@ class _Step3BirthdayScreenState extends State<Step3BirthdayScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'Show on profile',
-              style: _inputTextStyle.copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF6B6B6B),
+            Expanded(
+              child: Text(
+                'Show on profile',
+                style: _inputTextStyle.copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF6B6B6B),
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 8),
@@ -192,18 +197,22 @@ class _Step3BirthdayScreenState extends State<Step3BirthdayScreen> {
           ),
         ),
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => Step2GenderScreen(
-                name: widget.name,
-                email: widget.email,
-                password: widget.password,
-                birthday: _selectedDate,
-                showBirthday: _showOnProfile,
+          if (widget.testOnNavigate != null) {
+            widget.testOnNavigate!(widget.name, widget.email, widget.password, _selectedDate, _showOnProfile);
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => Step2GenderScreen(
+                  name: widget.name,
+                  email: widget.email,
+                  password: widget.password,
+                  birthday: _selectedDate,
+                  showBirthday: _showOnProfile,
+                ),
               ),
-            ),
-          );
+            );
+          }
         },
         child: const Text(
           'CONTINUE',

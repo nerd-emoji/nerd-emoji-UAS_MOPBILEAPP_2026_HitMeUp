@@ -8,11 +8,23 @@ import '../../services/auth_session.dart';
 import '../../services/oauth_service.dart';
 import '../../widgets/common_widgets.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/sign_in_utils.dart';
 import '../signup/step1_intro_screen.dart';
 import '../mainApp/discover.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+  const SignInScreen({
+    super.key,
+    this.testGoogleSignIn,
+    this.testLoginPost,
+  });
+
+  final Future<Map<String, dynamic>?> Function()? testGoogleSignIn;
+  final Future<http.Response> Function(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  })? testLoginPost;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -43,7 +55,9 @@ class _SignInScreenState extends State<SignInScreen> {
     });
 
     try {
-      final result = await _oauthService.signInWithGoogle();
+      final result = widget.testGoogleSignIn != null
+          ? await widget.testGoogleSignIn!()
+          : await _oauthService.signInWithGoogle();
 
       if (!mounted) return;
 
@@ -123,23 +137,32 @@ class _SignInScreenState extends State<SignInScreen> {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/users/login/');
 
     try {
-      final response = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'identifier': identifier,
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 12));
+      final response = await (widget.testLoginPost != null
+              ? widget.testLoginPost!(
+                  uri,
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'identifier': identifier,
+                    'password': password,
+                  }),
+                )
+              : http
+                  .post(
+                    uri,
+                    headers: {'Content-Type': 'application/json'},
+                    body: jsonEncode({
+                      'identifier': identifier,
+                      'password': password,
+                    }),
+                  )
+                  .timeout(const Duration(seconds: 12)));
 
       if (!mounted) {
         return;
       }
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final user = _tryParseUserObject(response.body);
+        final user = parseUserObject(response.body);
         if (user != null) {
           await AuthSession.instance.saveUser(user);
         }
@@ -155,17 +178,11 @@ class _SignInScreenState extends State<SignInScreen> {
         return;
       }
 
-      final backendError = _extractBackendError(response.body);
-      final normalizedBackendError = backendError.toLowerCase();
-      final isCredentialError = response.statusCode == 401 ||
-          response.statusCode == 403 ||
-          normalizedBackendError.contains('invalid username') ||
-          normalizedBackendError.contains('invalid password') ||
-          (normalizedBackendError.contains('invalid') &&
-              normalizedBackendError.contains('password'));
+      final backendError = extractBackendError(response.body);
+      final credentialError = isCredentialError(response.statusCode, backendError);
 
       setState(() {
-        _submitError = isCredentialError
+        _submitError = credentialError
             ? 'Incorrect username or password'
             : 'Login failed (${response.statusCode}): $backendError';
       });
@@ -185,43 +202,6 @@ class _SignInScreenState extends State<SignInScreen> {
         });
       }
     }
-  }
-
-  Map<String, dynamic>? _tryParseUserObject(String responseBody) {
-    try {
-      final decoded = jsonDecode(responseBody);
-      if (decoded is Map<String, dynamic>) {
-        return decoded;
-      }
-    } catch (_) {
-      // Intentionally ignored.
-    }
-    return null;
-  }
-
-  String _extractBackendError(String responseBody) {
-    try {
-      final decoded = jsonDecode(responseBody);
-      if (decoded is String && decoded.trim().isNotEmpty) {
-        return decoded;
-      }
-
-      if (decoded is Map<String, dynamic>) {
-        final detail = decoded['detail'];
-        if (detail is String && detail.trim().isNotEmpty) {
-          return detail;
-        }
-      }
-    } catch (_) {
-      // Keep fallback below.
-    }
-
-    final trimmed = responseBody.trim();
-    if (trimmed.isNotEmpty) {
-      return trimmed;
-    }
-
-    return 'Please check your credentials.';
   }
 
   @override
@@ -441,7 +421,13 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget _buildDivider() {
     return Row(
       children: [
-        Expanded(child: Container(height: 1, color: Colors.black26)),
+        const Expanded(
+          child: Divider(
+            color: Colors.black26,
+            thickness: 1,
+            height: 1,
+          ),
+        ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 12),
           child: Text(
@@ -453,7 +439,13 @@ class _SignInScreenState extends State<SignInScreen> {
             ),
           ),
         ),
-        Expanded(child: Container(height: 1, color: Colors.black26)),
+        const Expanded(
+          child: Divider(
+            color: Colors.black26,
+            thickness: 1,
+            height: 1,
+          ),
+        ),
       ],
     );
   }

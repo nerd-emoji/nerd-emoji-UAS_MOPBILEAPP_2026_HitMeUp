@@ -8,11 +8,19 @@ import 'step2_birthday_screen.dart';
 class Step1IntroScreen extends StatefulWidget {
   final String? initialName;
   final String? initialEmail;
+  final Future<http.Response> Function(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  })? testCheckEmailPost;
+  final void Function(String name, String email, String password)? testOnNavigate;
 
   const Step1IntroScreen({
     super.key,
     this.initialName,
     this.initialEmail,
+    this.testCheckEmailPost,
+    this.testOnNavigate,
   });
 
   @override
@@ -134,13 +142,19 @@ class _Step1IntroScreenState extends State<Step1IntroScreen> {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/users/check-email/');
 
     try {
-      final response = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email}),
-          )
-          .timeout(const Duration(seconds: 12));
+      final response = await (widget.testCheckEmailPost != null
+          ? widget.testCheckEmailPost!(
+              uri,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'email': email}),
+            )
+          : http
+              .post(
+                uri,
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({'email': email}),
+              )
+              .timeout(const Duration(seconds: 12)));
 
       if (!mounted) return;
 
@@ -155,16 +169,20 @@ class _Step1IntroScreenState extends State<Step1IntroScreen> {
           return;
         }
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => Step3BirthdayScreen(
-              name: name,
-              email: email,
-              password: password,
+        if (widget.testOnNavigate != null) {
+          widget.testOnNavigate!(name, email, password);
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => Step3BirthdayScreen(
+                name: name,
+                email: email,
+                password: password,
+              ),
             ),
-          ),
-        );
+          );
+        }
         return;
       }
 

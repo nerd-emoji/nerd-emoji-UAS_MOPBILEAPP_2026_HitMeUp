@@ -8,7 +8,7 @@ import 'package:hitmeup/screens/mainApp/community_chat_screen.dart';
 import 'package:hitmeup/services/auth_session.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../test/support/community_http_mocks.dart';
+import '../support/community_http_mocks.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

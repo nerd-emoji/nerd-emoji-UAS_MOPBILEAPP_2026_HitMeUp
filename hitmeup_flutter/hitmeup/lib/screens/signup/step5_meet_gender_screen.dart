@@ -12,6 +12,7 @@ class Step5MeetGenderScreen extends StatefulWidget {
     required this.birthday,
     required this.showBirthday,
     required this.location,
+    this.testOnNavigate,
   });
 
   final String name;
@@ -21,6 +22,7 @@ class Step5MeetGenderScreen extends StatefulWidget {
   final DateTime birthday;
   final bool showBirthday;
   final String location;
+  final void Function(String name, String email, String password, String gender, DateTime birthday, bool showBirthday, String location, String? meetGender)? testOnNavigate;
 
   @override
   State<Step5MeetGenderScreen> createState() => _Step5MeetGenderScreenState();
@@ -156,21 +158,25 @@ class _Step5MeetGenderScreenState extends State<Step5MeetGenderScreen> {
           ),
         ),
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => Step6InterestsScreen(
-                name: widget.name,
-                email: widget.email,
-                password: widget.password,
-                gender: widget.gender,
-                birthday: widget.birthday,
-                showBirthday: widget.showBirthday,
-                location: widget.location,
-                meetGender: _selected,
+          if (widget.testOnNavigate != null) {
+            widget.testOnNavigate!(widget.name, widget.email, widget.password, widget.gender, widget.birthday, widget.showBirthday, widget.location, _selected);
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => Step6InterestsScreen(
+                  name: widget.name,
+                  email: widget.email,
+                  password: widget.password,
+                  gender: widget.gender,
+                  birthday: widget.birthday,
+                  showBirthday: widget.showBirthday,
+                  location: widget.location,
+                  meetGender: _selected,
+                ),
               ),
-            ),
-          );
+            );
+          }
         },
         child: const Text(
           'CONTINUE',

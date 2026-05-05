@@ -16,6 +16,7 @@ class Step4LocationScreen extends StatefulWidget {
     required this.gender,
     required this.birthday,
     required this.showBirthday,
+    this.testOnNavigate,
   });
 
   final String name;
@@ -24,6 +25,7 @@ class Step4LocationScreen extends StatefulWidget {
   final String gender;
   final DateTime birthday;
   final bool showBirthday;
+  final void Function(String name, String email, String password, String gender, DateTime birthday, bool showBirthday, String location)? testOnNavigate;
 
   @override
   State<Step4LocationScreen> createState() => _Step4LocationScreenState();
@@ -381,20 +383,24 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
         onPressed: _selectedLocation.trim().isEmpty
             ? null
             : () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => Step5MeetGenderScreen(
-                      name: widget.name,
-                      email: widget.email,
-                      password: widget.password,
-                      gender: widget.gender,
-                      birthday: widget.birthday,
-                      showBirthday: widget.showBirthday,
-                      location: _selectedLocation.trim(),
+                if (widget.testOnNavigate != null) {
+                  widget.testOnNavigate!(widget.name, widget.email, widget.password, widget.gender, widget.birthday, widget.showBirthday, _selectedLocation.trim());
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => Step5MeetGenderScreen(
+                        name: widget.name,
+                        email: widget.email,
+                        password: widget.password,
+                        gender: widget.gender,
+                        birthday: widget.birthday,
+                        showBirthday: widget.showBirthday,
+                        location: _selectedLocation.trim(),
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
               },
         child: const Text(
           'CONTINUE',
